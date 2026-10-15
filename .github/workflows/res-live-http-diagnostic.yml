@@ -1,0 +1,39 @@
+name: RES live HTTP diagnostic
+on:
+  push:
+    branches: [release-hardening]
+    paths: ['.github/workflows/res-live-http-diagnostic.yml']
+  workflow_dispatch:
+jobs:
+  public-http-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Check real RES HTTP transport
+        env:
+          TARGET_URL: https://drivedacrisoficial.com/loja/
+        run: |
+          python - <<'PY'
+          import socket,os
+          from urllib.parse import urlparse
+          from server import get,resolve_public
+          url=os.environ['TARGET_URL']
+          host=urlparse(url).hostname
+          try:
+              name,ips=resolve_public(url)
+              print('DNS validated:',name,'public addresses:',len(ips))
+          except Exception as exc:
+              print('DNS validation failed:',type(exc).__name__,str(exc)[:300])
+              raise SystemExit(1)
+          try:
+              data,mime,final=get(url)
+              print('RES_HTTP_SUCCESS', 'bytes:',len(data),'content-type:',mime[:100],'final-host:',urlparse(final).hostname)
+          except Exception as exc:
+              print('RES_HTTP_FAILED',type(exc).__name__,str(exc)[:500])
+              raise SystemExit(1)
+          PY
