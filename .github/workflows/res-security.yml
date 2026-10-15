@@ -22,4 +22,6 @@ jobs:
         run: python -m pip install -r requirements.txt httpx
       - name: Run SSRF and resource-limit regressions
         working-directory: .
-        run: |\n          python -m unittest discover -s tests -p 'test_security.py' -v\n          python -m unittest discover -s tests -p 'test_deep_scan.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_security.py' -v
+          python -m unittest discover -s tests -p 'test_deep_scan.py' -v
