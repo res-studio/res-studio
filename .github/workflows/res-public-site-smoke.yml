@@ -1,5 +1,8 @@
 name: RES Public Site Single-Request Smoke
 on:
+  push:
+    branches: [release-hardening]
+    paths: ['.github/workflows/res-public-site-smoke.yml']
   workflow_dispatch:
 permissions:
   contents: read
