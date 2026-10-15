@@ -15,8 +15,7 @@ def broker(url):
         return base64.b64decode(answer['body']),answer['mime'],answer['final']
 
 async def capture(url):
-    assets=[]; errors=[]; requests=[]; seen=set(); total=0
-    pending=set()
+    assets=[]; errors=[]; requests=[]; seen=set(); nonlocal_total=[0]
     async with async_playwright() as p:
         browser=await p.chromium.launch(headless=True,args=['--disable-background-networking','--disable-extensions','--disable-quic','--no-first-run'])
         try:
@@ -29,7 +28,7 @@ async def capture(url):
                         await route.abort();return
                     body,mime,final=await asyncio.to_thread(broker,target)
                     await route.fulfill(status=200,body=body if route.request.method=='GET' else b'',content_type=mime or 'application/octet-stream')
-                    if target not in seen and len(assets)<35 and total+len(body)<=12_000_000:
+                    if target not in seen and len(assets)<35 and nonlocal_total[0]+len(body)<=12_000_000:
                         kind={'document':'html','script':'js','stylesheet':'css'}.get(route.request.resource_type)
                         if kind:
                             seen.add(target)
@@ -38,14 +37,13 @@ async def capture(url):
                 except Exception as exc:
                     if len(errors)<40:errors.append(str(exc)[:180])
                     await route.abort()
-            nonlocal_total=[0]
             await context.route('**/*',handler)
             page.on('request',lambda r:requests.append({'method':r.method,'type':r.resource_type,'url':r.url}) if len(requests)<150 else None)
             try:
                 await page.goto(url,wait_until='domcontentloaded',timeout=20000)
                 await page.wait_for_timeout(1500)
             except Exception as exc:errors.append('Navegação: '+str(exc)[:200])
-            return {'url':page.url,'assets':assets,'errors':errors,'requests':requests,'truncated':len(assets)>=35}
+            return {'url':page.url if page.url.startswith(('http://','https://')) else url,'assets':assets,'errors':errors,'requests':requests,'truncated':len(assets)>=35}
         finally:await browser.close()
 
 if __name__=='__main__':
