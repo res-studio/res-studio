@@ -40,6 +40,35 @@ The default `RES_HTTP_ENGINE=auto` uses DNS-pinned `requests` first, then tries 
 
 Copy `.env.example` for a reference to optional environment variables (the application reads environment variables; it does not automatically load the file). Live tests have retrieved HTML/CSS/JS from public storefronts, but dynamically loaded resources may require authorized HAR import or isolated browser capture. Truncated scans are incomplete by design.
 
+## System requirements
+
+RES Studio is currently a **local application**, not a hosted web service. These are practical **estimates**, not hardware benchmarks or guaranteed minimums; actual resource use depends on scan size, target website, and optional engines.
+
+| | Minimum (basic static scans) | Recommended (larger scans) |
+| --- | --- | --- |
+| Operating system | 64-bit Linux, macOS or Windows with a working Python 3.12+ environment | 64-bit Linux with current security updates |
+| CPU | 2 logical cores | 4+ logical cores |
+| Memory (RAM) | **4 GB** available system RAM | **8 GB or more** |
+| Free storage | **2 GB** for installation and small results | **10 GB or more** for larger scans and exports |
+| Python | **3.12+** (required) | **3.12+** |
+| Browser for UI | Recent Brave, Chrome, Firefox or Edge | Updated Chromium-based browser |
+| Network | Internet access to authorized public targets | Stable broadband |
+
+**Optional features and extra requirements**
+
+| Feature | Additional requirements |
+| --- | --- |
+| JavaScript unpacking / optional engines | **Node.js 22+** and `npm install`; may increase RAM and disk usage |
+| Isolated Chromium dynamic capture | **Docker** installed on the API host, a separately built Chromium image, and virtualization/container support |
+| Chromium + Docker workload | **8 GB RAM recommended**, preferably **16 GB** for larger jobs; allow several extra GB of disk space |
+| Local API | Port **8765** available on loopback (`127.0.0.1`) |
+
+**For machines with 8 GB RAM:** start with the Python-only static scanner, use small asset/depth limits, and avoid concurrent Chromium or heavy JavaScript analysis. Docker/Chromium is optional. An 8 GB machine can run basic features, but available memory and performance vary.
+
+**Platform note:** Linux is the primary documented/tested environment. Windows and macOS compatibility is not guaranteed by the current CI; Windows users may need to adapt the virtual-environment activation command. The app is not packaged as a native installer.
+
+**Security:** Keep the API bound to `127.0.0.1`. Never publish port 8765 to the internet. Scan only sites you own or are authorized to inspect.
+
 ## Quick start
 
 Requires **Python 3.12+**. Run these commands at the repository root:
