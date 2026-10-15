@@ -120,3 +120,19 @@ jobs:
           print('PINNED_CURL_SUCCESS',len(data),mime[:90],final)
           assert data and ('html' in mime.lower() or b'<html' in data[:500].lower())
           PY
+
+      - name: Compare pinned curl transport on other public sites
+        if: always()
+        env:
+          RES_HTTP_ENGINE: curl
+        run: |
+          python - <<'PY'
+          from server import get
+          targets=['https://example.com/','https://www.python.org/','https://www.wikipedia.org/','https://drivedacrisoficial.com/loja/']
+          for url in targets:
+            try:
+              data,mime,final=get(url)
+              print('MULTISITE_SUCCESS',url,'bytes',len(data),'mime',mime[:70])
+            except Exception as exc:
+              print('MULTISITE_FAILED',url,type(exc).__name__,str(exc)[:220])
+          PY
