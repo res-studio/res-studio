@@ -7,6 +7,7 @@ from collections import deque
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urldefrag, urlparse
 import re
+import time
 
 ASSET_PATTERN = re.compile(r"""(?:import\s*(?:[^'"]*?from\s*)?|import\s*\(|require\s*\()\s*['"]([^'"]+)['"]|sourceMappingURL\s*=\s*([^\s*]+)""")
 CSS_PATTERN = re.compile(r"""@import\s+(?:url\()?\s*['"]?([^'"\s)]+)""")
@@ -29,11 +30,11 @@ class PageLinks(HTMLParser):
 
 def discover(start, fetch, *, max_assets=500, max_pages=10,
              max_total_bytes=100_000_000, same_origin=True, max_depth=3,
-             on_asset=None, retain_content=True):
+             on_asset=None, retain_content=True, should_stop=None, max_seconds=300):
     """Return collected files and discovery diagnostics, with hard work limits."""
     if not 1 <= max_assets <= 5000 or not 1 <= max_pages <= 100:
         raise ValueError('Limites fora do intervalo permitido')
-    if not 1 <= max_total_bytes <= 1_000_000_000 or not 0 <= max_depth <= 10:
+    if not 1 <= max_total_bytes <= 1_000_000_000 or not 0 <= max_depth <= 10 or not 1 <= max_seconds <= 3600:
         raise ValueError('Limites fora do intervalo permitido')
     origin = urlparse(start).netloc.lower()
     queue = deque([('html', start, 0)])
@@ -43,7 +44,12 @@ def discover(start, fetch, *, max_assets=500, max_pages=10,
     pages = 0
     total = 0
     truncated = False
+    deadline=time.monotonic()+max_seconds
     while queue:
+        if (should_stop is not None and should_stop()) or time.monotonic() >= deadline:
+            truncated=True
+            errors.append('Análise interrompida ou tempo máximo atingido')
+            break
         kind, url, depth = queue.popleft()
         if url in seen: continue
         if len(files) >= max_assets or (kind == 'html' and pages >= max_pages):
