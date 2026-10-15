@@ -6,7 +6,7 @@
 
 A local-first, open-source toolkit for authorized website asset inspection and JavaScript analysis.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/lucasemanuelvm22-sudo/Ana-ahajbaaj/res-security.yml?branch=res-studio-ci&label=Security%20CI)](https://github.com/lucasemanuelvm22-sudo/Ana-ahajbaaj/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/res-studio/res-studio/res-security.yml?branch=main&label=Security%20CI)](https://github.com/res-studio/res-studio/actions)
 ![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)
 ![Status](https://img.shields.io/badge/status-pre--release-orange)
@@ -35,7 +35,7 @@ A local-first, open-source toolkit for authorized website asset inspection and J
 
 ## Quick start
 
-Requires **Python 3.12+**. Run these commands inside the `res-studio` directory:
+Requires **Python 3.12+**. Run these commands at the repository root:
 
 ```bash
 python3 -m venv .venv
@@ -65,7 +65,8 @@ Bug reports and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.m
 - [ ] DNS-pinned HTTP connections and egress filtering
 - [ ] Isolated Chromium worker
 - [ ] Fully validated container distribution with optional engines
-- [ ] Standalone public repository and license review
+- [x] Standalone public repository
+- [ ] License review
 - [ ] First stable release
 
 ## Documentation and version notes
