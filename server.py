@@ -469,3 +469,44 @@ def export(token:str):
         z.writestr('report.json',json.dumps(report,ensure_ascii=False,indent=2))
     mem.seek(0)
     return StreamingResponse(mem,media_type='application/zip',headers={'Content-Disposition':'attachment; filename="res-analysis.zip"'})
+
+
+@app.get('/api/jobs/{token}/export')
+def deep_export(token:str,mode:str='original'):
+    """Bounded ZIP of an authorized deep-scan session, with explicit provenance."""
+    if mode not in ('original','analyzed','reconstructed'):
+        raise HTTPException(400,'Modo de exportação inválido')
+    try:
+        state=deep_jobs.status(token)
+    except KeyError:
+        raise HTTPException(404,'Sessão não encontrada')
+    if state['status'] in ('queued','running'):
+        raise HTTPException(409,'Aguarde a conclusão da análise')
+    import sqlite3
+    from urllib.parse import urlsplit
+    mem=io.BytesIO()
+    report=[]
+    total=0
+    with zipfile.ZipFile(mem,'w',zipfile.ZIP_DEFLATED) as z:
+        with sqlite3.connect(deep_jobs._db(token)) as conn:
+            for fid,url,kind,size,content in conn.execute('SELECT id,url,type,size,content FROM assets ORDER BY id LIMIT 501'):
+                if len(report)>=500: break
+                content=content or ''
+                raw=content.encode('utf-8')
+                if total+len(raw)>25*1024*1024: break
+                total+=len(raw)
+                ext=kind if kind in ('html','css','js','json','svg','txt') else 'txt'
+                filename=f'assets/{fid:04d}.{ext}'
+                z.writestr(filename,raw)
+                entry={'id':fid,'url':url,'type':kind,'bytes':len(raw),'path':filename}
+                report.append(entry)
+                if mode in ('analyzed','reconstructed') and kind=='js':
+                    formatted=format_js(content)
+                    z.writestr(f'analyzed/{fid:04d}.js',formatted[:2_000_000])
+        z.writestr('report.json',json.dumps({'mode':mode,'assets':report,'status':state['status'],
+            'errors':state.get('errors',[]),'truncated':state.get('truncated',False)},ensure_ascii=False,indent=2))
+        if mode=='reconstructed':
+            z.writestr('README.txt','RES Studio - reconstrução parcial offline\\nOs arquivos preservam nomes numerados. URLs e dependências externas podem não funcionar.\\nBackend, banco de dados, código-fonte original e funcionalidades privadas não são recuperados.\\nConsulte report.json para URLs originais.\\n')
+    mem.seek(0)
+    return StreamingResponse(mem,media_type='application/zip',
+        headers={'Content-Disposition':f'attachment; filename="res-deep-{mode}.zip"'})
