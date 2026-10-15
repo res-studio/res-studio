@@ -26,6 +26,11 @@ class PageLinks(HTMLParser):
             if 'stylesheet' in rel: self.assets.append(('css', a['href']))
             elif 'modulepreload' in rel or 'preload' in rel and a.get('as') == 'script':
                 self.assets.append(('js', a['href']))
+        if tag == 'link' and a.get('href'):
+            rel = a.get('rel', '').lower().split()
+            kind = (a.get('as') or '').lower()
+            if 'preload' in rel and kind == 'style': self.assets.append(('css', a['href']))
+            if 'preload' in rel and kind == 'script': self.assets.append(('js', a['href']))
         if tag == 'a' and a.get('href'): self.pages.append(a['href'])
 
 def discover(start, fetch, *, max_assets=500, max_pages=10,
@@ -81,6 +86,9 @@ def discover(start, fetch, *, max_assets=500, max_pages=10,
             if kind == 'html':
                 parser = PageLinks()
                 parser.feed(text)
+                candidates.extend(parser.assets)
+                # Modern bundlers often expose static chunks through HTML preload hints.
+                # Only explicit public resource URLs are considered; no API discovery.
                 candidates.extend(parser.assets)
                 if pages < max_pages:
                     candidates.extend(('html', link) for link in parser.pages)
