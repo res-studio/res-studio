@@ -1,0 +1,31 @@
+name: RES Modern Site Integration
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**'
+      - '.github/workflows/res-modern-sites.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  modern-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install runtime and Chromium
+        working-directory: .
+        run: |
+          python -m pip install -r requirements.txt httpx
+          npm install --no-audit --no-fund
+          python -m playwright install --with-deps chromium
+      - name: Test modern JS modules, CSS, API, export and browser
+        working-directory: .
+        run: python -m unittest discover -s tests -p 'test_modern.py' -v
