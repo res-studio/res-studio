@@ -156,7 +156,10 @@ def get(url):
                     if not location: raise ValueError('Redirecionamento sem destino')
                     url=urljoin(url,location)
                     continue
-                r.raise_for_status()
+                if r.status_code >= 400:
+                    explanations={401:'Autenticação necessária',403:'Acesso negado pelo servidor (motivo não confirmado)',404:'Página não encontrada para esta requisição',429:'Limite de requisições do servidor',500:'Erro interno do site',502:'Gateway do site indisponível',503:'Serviço do site indisponível'}
+                    label=explanations.get(r.status_code,'Resposta HTTP de erro')
+                    raise ValueError(f'HTTP {r.status_code}: {label}. URL: {url[:200]}. O código HTTP não comprova bloqueio por bot.')
                 data=bytearray()
                 for chunk in r.iter_content(65536):
                     data.extend(chunk)
