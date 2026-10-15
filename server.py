@@ -285,6 +285,29 @@ async def import_har(request: Request):
             'errors':errors,'truncated':len(entries)>1000 or len(files)>=MAX_ASSETS}
 
 
+@app.post('/api/scan-auto')
+def scan_auto(s: Scan):
+    """Try the normal scanner, then the isolated browser if explicitly enabled."""
+    failures = []
+    try:
+        result = scan(s)
+        result['mode'] = 'auto-http'
+        result['fallback_errors'] = failures
+        return result
+    except Exception as exc:
+        failures.append('HTTP: ' + str(getattr(exc, 'detail', exc))[:250])
+    if os.environ.get('RES_ENABLE_ISOLATED_CHROMIUM') != '1':
+        raise HTTPException(422, {'message':'Captura HTTP falhou; Chromium isolado desabilitado. Ative RES_ENABLE_ISOLATED_CHROMIUM=1 ou importe um HAR.', 'attempts':failures})
+    try:
+        result = scan_dynamic(s)
+        result['mode'] = 'auto-browser'
+        result['fallback_errors'] = failures
+        return result
+    except Exception as exc:
+        failures.append('Chromium: ' + str(getattr(exc, 'detail', exc))[:250])
+        raise HTTPException(422, {'message':'Nenhum método automático recuperou a página. O Chromium isolado usa o mesmo broker HTTP e pode receber o mesmo 404. Importe um HAR de navegador autorizado.', 'attempts':failures})
+
+
 @app.post('/api/scan-dynamic')
 def scan_dynamic(s:Scan):
     try:
