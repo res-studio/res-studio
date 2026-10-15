@@ -2,3 +2,4 @@ fastapi>=0.110,<1
 uvicorn>=0.27,<1
 requests>=2.31,<3
 playwright>=1.48,<2
+curl_cffi>=0.11,<1
