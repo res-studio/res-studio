@@ -12,7 +12,7 @@ A local-first, open-source toolkit for authorized website asset inspection and J
 ![Status](https://img.shields.io/badge/status-pre--release-orange)
 ![Scope](https://img.shields.io/badge/deployment-local--only-blue)
 
-[Quick start](#quick-start) · [MCP](MCP.md) · [Features](#features) · [Security](SECURITY.md) · [License](LICENSE) · [Contributing](CONTRIBUTING.md)
+[Quick start](#quick-start) · [Changelog](CHANGELOG.md) · [MCP](MCP.md) · [Features](#features) · [Security](SECURITY.md) · [License](LICENSE) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -33,6 +33,12 @@ A local-first, open-source toolkit for authorized website asset inspection and J
 | Optional engines | Webcrack, Wakaru and Synchrony integrations |
 | Export | Download collected resources and analysis as ZIP/JSON |
 | Guardrails | URL filtering, size/time limits, API key support and rate limiting |
+
+## Beta HTTP transport
+
+The default `RES_HTTP_ENGINE=auto` uses DNS-pinned `requests` first, then tries DNS-pinned `curl_cffi` on selected HTTP 403/404/429 and transport failures. You can force `RES_HTTP_ENGINE=requests` or `RES_HTTP_ENGINE=curl`. Both transports enforce public-IP validation, TLS verification, redirect checks, response-size limits and disabled proxies. The fallback does not bypass private-address or size-limit rejections.
+
+Copy `.env.example` for a reference to optional environment variables (the application reads environment variables; it does not automatically load the file). Live tests have retrieved HTML/CSS/JS from public storefronts, but dynamically loaded resources may require authorized HAR import or isolated browser capture. Truncated scans are incomplete by design.
 
 ## Quick start
 
