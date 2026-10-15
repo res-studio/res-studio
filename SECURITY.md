@@ -12,7 +12,7 @@ RES Studio is designed for **local, authorized analysis**, not as a public multi
 
 ## Known limitations
 
-The HTTP scanner validates DNS before connecting but does not pin the connection to the validated IP. DNS rebinding/TOCTOU remains a risk. Chromium navigation is filtered by Playwright routes, not isolated by a network firewall; browser subrequests and redirects require stronger controls. Neither path should be considered safe for unrestricted public deployment.
+The HTTP scanner validates DNS before connecting but does not pin the connection to the validated IP. DNS rebinding/TOCTOU remains a risk. Chromium navigation is filtered by Playwright routes, not isolated by a network firewall; browser subrequests and redirects require stronger controls. Dynamic scanning is **disabled by default**; setting `RES_ENABLE_UNISOLATED_BROWSER=1` opts into this known risk for local testing only. Neither path should be considered safe for unrestricted public deployment.
 
 ## Reporting
 
