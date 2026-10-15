@@ -60,6 +60,8 @@ The Docker image runs the basic API and interface only; it does **not** include 
 
 Bug reports and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes, and report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
+See [Release checklist](RELEASE_CHECKLIST.md) for the outstanding security, licensing and testing requirements.
+
 ## Roadmap
 
 - [ ] DNS-pinned HTTP connections and egress filtering
@@ -112,7 +114,7 @@ Abra http://127.0.0.1:8765 no navegador.
 
 Execute apenas em `127.0.0.1`. O bloqueio de SSRF é uma defesa inicial e não substitui isolamento de rede para uso público; há risco residual de DNS rebinding. Não exponha este serviço diretamente na internet.
 
-Licença do código original: MIT (veja LICENSE).
+Licença do código original: ainda não definida; consulte RELEASE_CHECKLIST.md antes de redistribuir.
 
 ## v0.2 — integração de análise JavaScript
 
