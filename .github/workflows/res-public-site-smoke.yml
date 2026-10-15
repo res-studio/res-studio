@@ -2,7 +2,7 @@ name: RES Public Site Single-Request Smoke
 on:
   push:
     branches: [release-hardening]
-    paths: ['.github/workflows/res-public-site-smoke.yml']
+    paths: ['.github/workflows/res-public-site-smoke.yml', 'server.py', 'chromium_worker.py', 'deep_scan.py']
   workflow_dispatch:
 permissions:
   contents: read
