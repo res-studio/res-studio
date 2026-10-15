@@ -36,6 +36,17 @@ class BackgroundJobTest(unittest.TestCase):
       self.assertEqual(asset.status_code,200)
       self.assertIn('console.log',asset.json()['content'])
       deep_jobs.JOBS.pop(token,None)
+ def test_cancel_unknown_job(self):
+  self.assertEqual(TestClient(server.app).post('/api/jobs/notfound/cancel').status_code,404)
+ def test_cancel_flag(self):
+  token='fixturecancel'
+  deep_jobs.JOBS[token]={'status':'running','cancel_requested':False}
+  try:
+   response=TestClient(server.app).post('/api/jobs/'+token+'/cancel')
+   self.assertEqual(response.status_code,200)
+   self.assertTrue(response.json()['cancel_requested'])
+  finally:
+   deep_jobs.JOBS.pop(token,None)
  def test_invalid_pagination(self):
   response=TestClient(server.app).get('/api/jobs/notfound/assets?limit=9999')
   self.assertEqual(response.status_code,400)
