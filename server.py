@@ -177,6 +177,8 @@ def scan_dynamic(s:Scan):
             from playwright_scan import capture
         except ImportError:
             raise HTTPException(503, 'Instale Playwright: pip install -r requirements.txt && python -m playwright install chromium')
+        if os.environ.get('RES_ENABLE_UNISOLATED_BROWSER') != '1':
+            raise HTTPException(503, 'Captura dinâmica desabilitada por segurança. Exige worker Chromium isolado com firewall de saída; RES_ENABLE_UNISOLATED_BROWSER=1 apenas para uso local de risco conhecido.')
         result=asyncio.run(capture(s.url,safe_url))
         files=[]
         for asset in result['assets']:
