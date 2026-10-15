@@ -1,0 +1,45 @@
+name: RES MCP Integration
+on:
+  push:
+    branches: [release-hardening, main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mcp-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install MCP integration
+        run: python -m pip install -r requirements-mcp.txt httpx
+      - name: Syntax and import check
+        run: |
+          python -m py_compile mcp_server.py
+          python -c "from mcp_server import mcp; print('MCP import OK')"
+      - name: End-to-end MCP stdio handshake and tools
+        run: |
+          python - <<'PY'
+          import asyncio, sys
+          from mcp import ClientSession, StdioServerParameters
+          from mcp.client.stdio import stdio_client
+
+          async def main():
+              params=StdioServerParameters(command=sys.executable,args=['mcp_server.py'])
+              async with stdio_client(params) as (read,write):
+                  async with ClientSession(read,write) as session:
+                      await asyncio.wait_for(session.initialize(),timeout=20)
+                      tools=await asyncio.wait_for(session.list_tools(),timeout=20)
+                      names={tool.name for tool in tools.tools}
+                      expected={'scan_website','scan_dynamic','start_deep_scan','get_deep_scan_status','list_deep_scan_assets','inspect_deep_scan_asset','get_engines'}
+                      assert expected <= names, (expected-names,names)
+                      result=await asyncio.wait_for(session.call_tool('get_engines',{}),timeout=20)
+                      assert not result.isError, result
+                      print('MCP handshake, tool discovery, get_engines OK')
+          asyncio.run(main())
+          PY
