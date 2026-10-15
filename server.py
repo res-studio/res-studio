@@ -141,6 +141,9 @@ class PinnedAdapter(requests.adapters.HTTPAdapter):
         return pool_cls(**kw)
 
 def get(url):
+    if os.environ.get('RES_HTTP_ENGINE') == 'curl':
+        from curl_transport import get as curl_get
+        return curl_get(url)
     """Fetch using validated, pinned public IPs; retry alternate IPs on transport errors.
 
     HTTP status errors are returned as-is, not interpreted as anti-bot blocks.
