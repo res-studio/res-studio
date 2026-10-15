@@ -1,0 +1,43 @@
+name: RES Full Project Gate
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-project:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require complete original project
+        run: |
+          for file in server.py playwright_scan.py requirements.txt tests/test_api.py tests/smoke.py engine.mjs index.html package.json; do
+            test -f "$file" || { echo "::error::Missing $file"; exit 1; }
+          done
+      - name: Install dependencies
+        working-directory: .
+        run: |
+          python -m pip install -r requirements.txt httpx
+          npm install --no-audit --no-fund
+          python -m playwright install --with-deps chromium
+      - name: Run original backend and browser tests
+        working-directory: .
+        run: |
+          python -m compileall -q server.py playwright_scan.py tests
+          npm test
+          python -m unittest discover -s tests -p 'test_*.py' -v
+          python tests/smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: res-full-project-report
+          path: test-report.json
+          if-no-files-found: ignore
