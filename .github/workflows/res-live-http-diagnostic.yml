@@ -107,3 +107,16 @@ jobs:
             except Exception as exc:
               print('curl_cffi profile:',profile,'error:',type(exc).__name__)
           PY
+
+      - name: Validate opt-in DNS-pinned curl transport
+        if: always()
+        env:
+          RES_HTTP_ENGINE: curl
+        run: |
+          python - <<'PY'
+          from server import get
+          url='https://drivedacrisoficial.com/loja/'
+          data,mime,final=get(url)
+          print('PINNED_CURL_SUCCESS',len(data),mime[:90],final)
+          assert data and ('html' in mime.lower() or b'<html' in data[:500].lower())
+          PY
