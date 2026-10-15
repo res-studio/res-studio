@@ -1,0 +1,35 @@
+name: Publish RES Studio Beta 1
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-beta-1.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish-beta:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify beta source and docs
+        run: |
+          test -f README.md
+          test -f CHANGELOG.md
+          test -f SECURITY.md
+          test -f .env.example
+          grep -q '0.1.0-beta.1' CHANGELOG.md
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.1.0-beta.1 >/dev/null 2>&1; then
+            echo 'Beta release already exists; leaving unchanged.'
+          else
+            gh release create v0.1.0-beta.1 \
+              --target c3f60cd24b18eb97a892794dbd11aa8d50dd87de \
+              --title 'RES Studio v0.1.0 Beta 1' \
+              --notes-file CHANGELOG.md \
+              --prerelease
+          fi
