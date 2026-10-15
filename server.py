@@ -255,6 +255,39 @@ def scan_deep(s:DeepScan):
     except Exception as exc:
         raise HTTPException(400,str(exc)[:500])
 
+@app.post('/api/jobs/deep')
+def start_deep_job(s:DeepScan):
+    from deep_jobs import submit
+    try:
+        if not 1 <= s.max_total_mb <= 1000:
+            raise ValueError('max_total_mb deve estar entre 1 e 1000')
+        safe_url(s.url)
+        settings={'max_assets':s.max_assets,'max_pages':s.max_pages,
+                  'max_total_bytes':s.max_total_mb*1_000_000,
+                  'max_depth':s.max_depth,'same_origin':s.same_origin}
+        return {'token':submit(s.url,get,settings),'status':'running'}
+    except Exception as exc: raise HTTPException(400,str(exc)[:300])
+
+@app.get('/api/jobs/{token}')
+def deep_job_status(token:str):
+    from deep_jobs import status
+    try: return status(token)
+    except KeyError: raise HTTPException(404,'Tarefa não encontrada')
+
+@app.get('/api/jobs/{token}/assets')
+def deep_job_assets(token:str,limit:int=100,offset:int=0):
+    from deep_jobs import assets
+    if not 1 <= limit <= 500 or offset < 0:
+        raise HTTPException(400,'Paginação inválida')
+    try: return {'assets':assets(token,limit,offset),'limit':limit,'offset':offset}
+    except KeyError: raise HTTPException(404,'Tarefa não encontrada')
+
+@app.get('/api/jobs/{token}/assets/{fid}')
+def deep_job_asset(token:str,fid:int):
+    from deep_jobs import asset
+    try: return asset(token,fid)
+    except KeyError: raise HTTPException(404,'Arquivo não encontrado')
+
 class Decompile(BaseModel):
     engine: str = 'webcrack'
 
