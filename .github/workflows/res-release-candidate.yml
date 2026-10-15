@@ -34,11 +34,12 @@ jobs:
           import isolated_chromium
           base='https://fixture.example'
           def validate(url):
-              if not url.startswith(base): raise ValueError('Unapproved URL')
+              if url not in (base,base+'/'): raise ValueError('Unapproved URL')
           def fetch(url):
-              if url == base: return b'<html><title>RES</title></html>', 'text/html',url
+              if url in (base,base+'/'): return b'<html><title>RES</title></html>', 'text/html',url
               raise ValueError('Unapproved asset')
           result=isolated_chromium.capture(base,fetch,validate)
+          assert not result['errors'], result
           assert result['assets'], result
           assert result['assets'][0]['type']=='html', result
           print('Isolated Chromium captured public fixture via broker')
