@@ -64,3 +64,28 @@ jobs:
               finally:
                 s.close()
           PY
+
+      - name: Compare domain root and storefront paths
+        if: always()
+        run: |
+          python - <<'PY'
+          from server import resolve_public,PinnedAdapter
+          import requests
+          urls=['https://drivedacrisoficial.com/','https://drivedacrisoficial.com/loja/','https://www.drivedacrisoficial.com/','https://www.drivedacrisoficial.com/loja/']
+          for url in urls:
+            try:
+              host,ips=resolve_public(url)
+              for ip in ips[:2]:
+                s=requests.Session()
+                s.trust_env=False
+                s.mount('https://',PinnedAdapter(host,[ip]))
+                try:
+                  with s.get(url,allow_redirects=False,stream=True,timeout=(4,12),headers={'User-Agent':'RES-Studio/0.1 (read-only analysis)'}) as r:
+                    print('URL:',url,'IP:',ip,'status:',r.status_code,'location:',r.headers.get('Location','')[:120],'type:',r.headers.get('Content-Type','')[:80])
+                except requests.RequestException as exc:
+                  print('URL:',url,'IP:',ip,'transport:',type(exc).__name__)
+                finally:
+                  s.close()
+            except Exception as exc:
+              print('URL:',url,'validation:',type(exc).__name__,str(exc)[:100])
+          PY
