@@ -47,11 +47,12 @@ jobs:
         run: docker compose config --quiet
       - name: Container API smoke test
         run: |
+          export RES_API_KEY=ci-test-key
           docker compose up -d --build
           trap 'docker compose down --volumes' EXIT
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8765/ >/dev/null; then break; fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:8765/api/engines >/dev/null
+          curl -fsS -H 'x-api-key: ci-test-key' http://127.0.0.1:8765/api/engines >/dev/null
           curl -fsS http://127.0.0.1:8765/ | grep -q 'Análise profunda'
