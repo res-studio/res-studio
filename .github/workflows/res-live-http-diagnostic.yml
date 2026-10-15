@@ -151,3 +151,21 @@ jobs:
           PY
       - name: Automatic transport regression tests
         run: python -m unittest discover -s tests -p 'test_auto_transport.py' -v
+
+      - name: Compare real ecommerce storefront
+        env:
+          RES_HTTP_ENGINE: auto
+        run: |
+          python - <<'PY'
+          from server import scan,Scan
+          url='https://www.cacaushow.com.br/'
+          try:
+              result=scan(Scan(url=url))
+              files=result['files']
+              types=sorted({f['type'] for f in files})
+              print('ECOMMERCE_SCAN_SUCCESS',url,'files',len(files),'types',types,'errors',len(result['errors']),'truncated',result['truncated'])
+              assert files and files[0]['type']=='html'
+          except Exception as exc:
+              print('ECOMMERCE_SCAN_FAILED',url,type(exc).__name__,str(exc)[:400])
+              raise
+          PY
