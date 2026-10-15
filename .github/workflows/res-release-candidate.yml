@@ -1,0 +1,38 @@
+name: RES Release Candidate Gate
+on:
+  push:
+    branches: [release-hardening]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt httpx
+      - name: Python syntax validation
+        run: python -m compileall -q server.py deep_scan.py deep_jobs.py playwright_scan.py tests
+      - name: Regression suite
+        run: python -m unittest discover -s tests -v
+      - name: Docker build
+        run: docker build -t res-studio:release-candidate .
+      - name: Docker compose validation
+        run: docker compose config --quiet
+      - name: Container API smoke test
+        run: |
+          docker compose up -d --build
+          trap 'docker compose down --volumes' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8765/api/engines >/dev/null
+          curl -fsS http://127.0.0.1:8765/ | grep -q 'Análise profunda'
