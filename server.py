@@ -225,6 +225,36 @@ def scan_dynamic(s:Scan):
     except HTTPException: raise
     except Exception as exc: raise HTTPException(400,str(exc)[:500])
 
+class DeepScan(Scan):
+    max_assets: int = 500
+    max_pages: int = 10
+    max_total_mb: int = 100
+    max_depth: int = 3
+    same_origin: bool = True
+
+@app.post('/api/scan-deep')
+def scan_deep(s:DeepScan):
+    """Breadth-first public asset discovery; local API only."""
+    from deep_scan import discover
+    try:
+        if not 1 <= s.max_total_mb <= 1000:
+            raise ValueError('max_total_mb deve estar entre 1 e 1000')
+        result=discover(s.url,get,max_assets=s.max_assets,max_pages=s.max_pages,
+                        max_total_bytes=s.max_total_mb*1_000_000,
+                        max_depth=s.max_depth,same_origin=s.same_origin)
+        if not result['files']:
+            raise ValueError('Nenhum arquivo recuperado')
+        for f in result['files']:
+            f['analysis']=analyze(f['url'],f['content'])
+        token=store_session(result['files'])
+        return {'token':token,'url':s.url,'mode':'deep',
+                'files':[{k:v for k,v in f.items() if k!='content'} for f in result['files']],
+                'errors':result['errors'],'requests':result['requests'],
+                'truncated':result['truncated'],'total_bytes':result['total_bytes'],
+                'pages':result['pages'],'discovered_urls':result['discovered_urls']}
+    except Exception as exc:
+        raise HTTPException(400,str(exc)[:500])
+
 class Decompile(BaseModel):
     engine: str = 'webcrack'
 
