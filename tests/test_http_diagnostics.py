@@ -1,6 +1,7 @@
 """HTTP diagnostics: a response code alone cannot establish anti-bot blocking."""
 import unittest
 from unittest.mock import patch
+import os
 from server import get
 
 class FakeResponse:
@@ -21,7 +22,7 @@ class HttpDiagnosticTests(unittest.TestCase):
             with self.subTest(code=code):
                 session=FakeSession()
                 session.status=code
-                with patch('server.resolve_public',return_value=('example.com',['93.184.215.14'])),patch('server.requests.Session',return_value=session):
+                with patch.dict(os.environ, {'RES_HTTP_ENGINE':'requests'}),patch('server.resolve_public',return_value=('example.com',['93.184.215.14'])),patch('server.requests.Session',return_value=session):
                     with self.assertRaisesRegex(ValueError,word):
                         get('https://example.com/')
 
