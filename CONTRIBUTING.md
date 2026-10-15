@@ -11,3 +11,7 @@ Thanks for helping improve RES Studio.
 Do not submit secrets, tokens, captured private data, unauthorized target content or exploits targeting third parties. Follow `SECURITY.md` for vulnerability reports.
 
 The maintainers review contributions; a passing CI check is not an automatic approval.
+
+## Licensing contributions
+
+By submitting a contribution, you agree to license your original contribution under the project's [MIT License](LICENSE). Submit only code you have the rights to contribute. Identify copied or adapted third-party code and preserve applicable attribution; do not include third-party code with incompatible license obligations. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
