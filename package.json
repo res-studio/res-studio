@@ -1,0 +1,13 @@
+{
+  "name": "res-studio-engines",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --check engine.mjs"
+  },
+  "dependencies": {
+    "webcrack": "^2.15.0",
+    "@wakaru/cli": "^1.14.0",
+    "deobfuscator": "2.4.6"
+  }
+}

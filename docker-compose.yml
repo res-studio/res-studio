@@ -1,0 +1,15 @@
+services:
+  res-studio:
+    build: .
+    ports:
+      - "127.0.0.1:8765:8765"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    mem_limit: 512m
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid
+    restart: "no"
