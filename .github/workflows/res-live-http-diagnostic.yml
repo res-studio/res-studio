@@ -37,3 +37,30 @@ jobs:
               print('RES_HTTP_FAILED',type(exc).__name__,str(exc)[:500])
               raise SystemExit(1)
           PY
+
+      - name: Compare pinned HTTP request variants
+        if: always()
+        env:
+          TARGET_URL: https://drivedacrisoficial.com/loja/
+        run: |
+          python - <<'PY'
+          import os,requests
+          from server import resolve_public,PinnedAdapter
+          url=os.environ['TARGET_URL']
+          host,ips=resolve_public(url)
+          print('Public IP count:',len(ips))
+          variants=[('RES default','RES-Studio/0.1 (read-only analysis)'),('Browser-like','Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/125.0 Safari/537.36')]
+          for ip in ips[:4]:
+            for label,ua in variants:
+              s=requests.Session()
+              s.trust_env=False
+              s.mount('https://',PinnedAdapter(host,[ip]))
+              s.mount('http://',PinnedAdapter(host,[ip]))
+              try:
+                with s.get(url,headers={'User-Agent':ua,'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'},allow_redirects=False,timeout=(4,12),stream=True) as r:
+                  print(label,'IP:',ip,'status:',r.status_code,'type:',r.headers.get('content-type','')[:80])
+              except requests.RequestException as e:
+                print(label,'IP:',ip,'transport:',type(e).__name__)
+              finally:
+                s.close()
+          PY
