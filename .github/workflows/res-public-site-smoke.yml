@@ -1,0 +1,27 @@
+name: RES Public Site Single-Request Smoke
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Fetch one public HTML page (no crawling or downloads)
+        run: |
+          python - <<'PY'
+          import time
+          from server import get
+          url='https://drivedacrisoficial.com/loja/'
+          start=time.monotonic()
+          body,typ,final=get(url)
+          print('Status: fetched; content-type:',typ,'bytes:',len(body),'seconds:',round(time.monotonic()-start,2),'final host:',final.split('/')[2])
+          assert 'html' in typ.lower() or b'<html' in body[:1000].lower()
+          assert len(body)>100
+          PY
