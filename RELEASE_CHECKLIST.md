@@ -8,7 +8,7 @@ This repository is public, but a public repository is not the same as a safe pub
 - [ ] Review direct and transitive dependency licenses (including the GPL-licensed deobfuscator).
 - [ ] Select and add an appropriate project LICENSE; do not assume MIT covers third-party dependencies.
 - [x] Pin DNS resolution to validated public IP addresses in the static scanner, including redirects (Requests 2.32+ regression test).
-- [ ] Enforce network egress restrictions for Chromium with an isolated worker/container.
+- [x] Implement network-disconnected Docker Chromium worker (`--network none`) with parent-side validated fetch broker; full Docker end-to-end CI verification pending.
 - [ ] Add regression tests for DNS rebinding, redirects and browser network access.
 - [ ] Validate Docker build and document missing optional engines (release candidate CI gate added; await passing run).
 - [ ] Run all CI workflows on the exact release commit.
