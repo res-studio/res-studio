@@ -1,6 +1,8 @@
 name: RES dependency smoke test
 on:
   push:
+    branches: [main, release-hardening]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 permissions:
@@ -26,7 +28,7 @@ jobs:
           mkdir -p /tmp/res-engines
           cd /tmp/res-engines
           npm init -y
-          npm install --no-audit --no-fund webcrack@^2.15.0 @wakaru/cli@^1.14.0 deobfuscator@2.4.6
+          npm install --no-audit --no-fund webcrack@^2.15.0 @wakaru/cli@^1.14.0
           node -e 'import("webcrack").then(m=>console.log("Webcrack loaded:",typeof m.webcrack))'
           ls -la node_modules/.bin/
       - name: Check Playwright Chromium
