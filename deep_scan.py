@@ -28,7 +28,7 @@ class PageLinks(HTMLParser):
         if tag == 'a' and a.get('href'): self.pages.append(a['href'])
 
 def discover(start, fetch, *, max_assets=500, max_pages=10,
-             max_total_bytes=100_000_000, same_origin=True, max_depth=3):
+             max_total_bytes=100_000_000, same_origin=True, max_depth=3,\n             on_asset=None, retain_content=True):
     """Return collected files and discovery diagnostics, with hard work limits."""
     if not 1 <= max_assets <= 5000 or not 1 <= max_pages <= 100:
         raise ValueError('Limites fora do intervalo permitido')
@@ -64,8 +64,7 @@ def discover(start, fetch, *, max_assets=500, max_pages=10,
                     continue
                 pages += 1
             total += len(data)
-            files.append({'id':len(files), 'type':kind, 'url':final,
-                          'size':len(data), 'content':text})
+            asset={'id':len(files), 'type':kind, 'url':final,\n                   'size':len(data), 'content':text}\n            if on_asset is not None: on_asset(asset)\n            files.append(asset if retain_content else {k:v for k,v in asset.items() if k!='content'})
             requests.append({'url':url,'final_url':final,'size':len(data),'type':kind})
             if depth >= max_depth: continue
             candidates = []
