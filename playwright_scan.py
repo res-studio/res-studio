@@ -20,7 +20,7 @@ async def capture(url, validator):
             headless=True,
             proxy={'server':'http://127.0.0.1:9'},
             args=['--no-first-run','--disable-background-networking','--disable-extensions',
-                  '--disable-sync','--disable-quic','--no-pings','--disable-features=WebRtcHideLocalIpsWithMdns'])
+                  '--disable-sync','--disable-quic','--no-pings','--force-webrtc-ip-handling-policy=disable_non_proxied_udp'])
         try:
             context = await browser.new_context(accept_downloads=False, service_workers='block', ignore_https_errors=False, permissions=[])
             page = await context.new_page()
