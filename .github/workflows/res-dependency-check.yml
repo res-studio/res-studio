@@ -1,6 +1,8 @@
 name: RES dependency smoke test
 on:
   push:
+    branches: [main, release-hardening]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 permissions:
@@ -10,11 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Check Python packages
@@ -26,7 +28,7 @@ jobs:
           mkdir -p /tmp/res-engines
           cd /tmp/res-engines
           npm init -y
-          npm install --no-audit --no-fund webcrack@^2.15.0 @wakaru/cli@^1.14.0 deobfuscator@2.4.6
+          npm install --no-audit --no-fund webcrack@^2.15.0 @wakaru/cli@^1.14.0
           node -e 'import("webcrack").then(m=>console.log("Webcrack loaded:",typeof m.webcrack))'
           ls -la node_modules/.bin/
       - name: Check Playwright Chromium

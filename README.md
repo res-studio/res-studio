@@ -6,26 +6,27 @@
 
 A local-first, open-source toolkit for authorized website asset inspection and JavaScript analysis.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/lucasemanuelvm22-sudo/Ana-ahajbaaj/res-security.yml?branch=res-studio-ci&label=Security%20CI)](https://github.com/lucasemanuelvm22-sudo/Ana-ahajbaaj/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/res-studio/res-studio/res-security.yml?branch=main&label=Security%20CI)](https://github.com/res-studio/res-studio/actions)
 ![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)
 ![Status](https://img.shields.io/badge/status-pre--release-orange)
 ![Scope](https://img.shields.io/badge/deployment-local--only-blue)
 
-[Quick start](#quick-start) · [Features](#features) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+[Quick start](#quick-start) · [Changelog](CHANGELOG.md) · [MCP](MCP.md) · [Features](#features) · [Security](SECURITY.md) · [License](LICENSE) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
 ---
 
 > [!IMPORTANT]
-> RES Studio is **pre-release software for local, authorized use**. Do not expose the API to the public internet. DNS rebinding and Chromium network isolation are not fully addressed.
+> RES Studio is **pre-release software for local, authorized use**. Do not expose the API to the public internet. DNS-pinned connections have regression coverage, but Chromium egress isolation requires an explicitly enabled Docker worker; it is not included in the minimal app container.
 
 ## Features
 
 | Capability | Description |
 | --- | --- |
 | Static capture | Inspect public HTML, JavaScript and CSS assets |
+| Deep scan | Bounded recursive HTML, JavaScript and CSS discovery; background jobs with SQLite, progress and cancellation |
 | Dynamic capture | Optional Chromium-based capture via Playwright |
 | JS analysis | Heuristic formatting, framework and dependency signals |
 | Bundle exploration | Webcrack-based bundle unpacking where supported |
@@ -33,9 +34,15 @@ A local-first, open-source toolkit for authorized website asset inspection and J
 | Export | Download collected resources and analysis as ZIP/JSON |
 | Guardrails | URL filtering, size/time limits, API key support and rate limiting |
 
+## Beta HTTP transport
+
+The default `RES_HTTP_ENGINE=auto` uses DNS-pinned `requests` first, then tries DNS-pinned `curl_cffi` on selected HTTP 403/404/429 and transport failures. You can force `RES_HTTP_ENGINE=requests` or `RES_HTTP_ENGINE=curl`. Both transports enforce public-IP validation, TLS verification, redirect checks, response-size limits and disabled proxies. The fallback does not bypass private-address or size-limit rejections.
+
+Copy `.env.example` for a reference to optional environment variables (the application reads environment variables; it does not automatically load the file). Live tests have retrieved HTML/CSS/JS from public storefronts, but dynamically loaded resources may require authorized HAR import or isolated browser capture. Truncated scans are incomplete by design.
+
 ## Quick start
 
-Requires **Python 3.12+**. Run these commands inside the `res-studio` directory:
+Requires **Python 3.12+**. Run these commands at the repository root:
 
 ```bash
 python3 -m venv .venv
@@ -46,7 +53,18 @@ uvicorn server:app --host 127.0.0.1 --port 8765
 
 Open **http://127.0.0.1:8765**.
 
-Optional JavaScript engines: install Node.js 22+ and run `npm install` in the same directory. Optional browser capture: run `python -m playwright install chromium`.
+Optional JavaScript engines: install Node.js 22+ and run `npm install` in the same directory. For isolated dynamic capture, build the separate Chromium image and run the Python API on the host with Docker installed (instructions below).
+
+### Isolated Chromium dynamic capture
+
+The browser executes in a separate Docker container with **no network interface**. Its only way to receive approved HTTP content is the parent-side, URL-validated fetch broker over standard input/output. Docker must be installed on the same host as the Python API.
+
+```bash
+docker build -f Dockerfile.chromium -t res-studio-chromium:local .
+RES_ENABLE_ISOLATED_CHROMIUM=1 uvicorn server:app --host 127.0.0.1 --port 8765
+```
+
+Use the **Playwright** button in the interface. The parent requires Docker CLI access and creates a short-lived worker with `--network none`, read-only filesystem, non-root user, restricted capabilities, and resource limits. **Do not mount the Docker socket inside the main API container** to enable this; run the API locally on the host instead. The basic `docker compose up` deployment keeps dynamic capture disabled. Do not use the legacy `RES_ENABLE_UNISOLATED_BROWSER` flag.
 
 ### Minimal Docker setup
 
@@ -54,18 +72,39 @@ Optional JavaScript engines: install Node.js 22+ and run `npm install` in the sa
 docker compose up --build
 ```
 
-The Docker image runs the basic API and interface only; it does **not** include Node engines or Chromium. It binds host port 8765 to localhost only. See [Security](SECURITY.md).
+The Docker image includes static/deep scanning and SQLite-backed background jobs, with a writable Docker volume for job storage; it does **not** include Node engines or Chromium. Background jobs are local-process state and are not restart-resumable. It binds host port 8765 to localhost only. See [Security](SECURITY.md).
+
+## License and third-party notices
+
+The original RES Studio source code is licensed under the [MIT License](LICENSE). Dependencies, Chromium binaries and captured website resources retain their own rights and licenses. See [Third-party notices](THIRD_PARTY_NOTICES.md). A dependency license inventory is generated by GitHub Actions; the release audit remains necessary before distributing bundled builds.
+
+## Responsible use and disclaimer
+
+RES Studio is a **software analysis and decompilation aid**, not a hosting service or the operator of any website being inspected. It helps users inspect accessible HTML, CSS, JavaScript and related assets; it does not grant permission to copy, republish, impersonate or commercially exploit third-party websites.
+
+**You are responsible for the targets you inspect and how you use the results.** Only analyze websites and assets you own or are authorized to inspect. Respect applicable laws, contracts, intellectual-property rights, privacy and website terms. The RES Studio contributors do not endorse unauthorized reverse engineering, and, to the extent permitted by applicable law, disclaim responsibility for independent misuse of the tool or resulting websites. This notice does not eliminate liability that cannot legally be excluded.
+
+The software is supplied **“AS IS”**, without warranties, as stated in the [MIT License](LICENSE).
+
+## AI agent integration (MCP)
+
+An optional local stdio MCP adapter lets compatible agents use bounded static/dynamic capture and deep-scan tools. Install `requirements-mcp.txt` and follow [MCP setup and safety notes](MCP.md). It does not run an AI model locally and is not exposed as a public server.
 
 ## Contribute
 
 Bug reports and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes, and report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
+See [Release checklist](RELEASE_CHECKLIST.md) for the outstanding security, licensing and testing requirements.
+
 ## Roadmap
 
-- [ ] DNS-pinned HTTP connections and egress filtering
-- [ ] Isolated Chromium worker
+- [x] DNS-pinned HTTP connections (Requests 2.32+; regression tested)
+- [x] Operating-system network egress filtering for the optional Chromium worker (`--network none`); static scanner uses pinned-IP HTTP
+- [x] Network-disconnected Chromium Docker worker and validated stdio fetch broker (release CI passed at 813b7e22)
 - [ ] Fully validated container distribution with optional engines
-- [ ] Standalone public repository and license review
+- [x] Standalone public repository
+- [x] Project MIT license selected and added
+- [ ] Complete dependency and redistribution license review
 - [ ] First stable release
 
 ## Documentation and version notes
@@ -111,7 +150,7 @@ Abra http://127.0.0.1:8765 no navegador.
 
 Execute apenas em `127.0.0.1`. O bloqueio de SSRF é uma defesa inicial e não substitui isolamento de rede para uso público; há risco residual de DNS rebinding. Não exponha este serviço diretamente na internet.
 
-Licença do código original: MIT (veja LICENSE).
+Licença do código original: ainda não definida; consulte RELEASE_CHECKLIST.md antes de redistribuir.
 
 ## v0.2 — integração de análise JavaScript
 

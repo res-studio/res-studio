@@ -7,7 +7,6 @@
   },
   "dependencies": {
     "webcrack": "^2.15.0",
-    "@wakaru/cli": "^1.14.0",
-    "deobfuscator": "2.4.6"
+    "@wakaru/cli": "^1.14.0"
   }
 }

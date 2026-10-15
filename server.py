@@ -80,37 +80,135 @@ def store_session(files):
 class Scan(BaseModel):
     url:str
 
-def safe_url(url):
+def resolve_public(url):
     p=urlparse(url)
     if p.scheme not in ('http','https') or not p.hostname or p.username or p.password:
         raise ValueError('URL HTTP(S) inválida')
     if p.port not in (None,80,443): raise ValueError('Porta não permitida')
     if p.fragment: raise ValueError('Fragmentos não permitidos')
-    if not p.hostname or len(p.hostname)>253: raise ValueError('Hostname inválido')
-    if p.hostname.endswith('.local') or p.hostname.endswith('.internal') or p.hostname.endswith('.localhost'):
+    host=p.hostname.rstrip('.').lower()
+    if not host or len(host)>253 or host in ('localhost','local','internal') or host.endswith(('.local','.internal','.localhost')):
         raise ValueError('Hostname interno bloqueado')
-    for result in socket.getaddrinfo(p.hostname,None,type=socket.SOCK_STREAM):
+    addresses=[]
+    for result in socket.getaddrinfo(host,p.port or (443 if p.scheme=='https' else 80),type=socket.SOCK_STREAM):
         ip=ipaddress.ip_address(result[4][0])
         if not ip.is_global: raise ValueError('Endereço privado/reservado bloqueado')
+        address=str(ip)
+        if address not in addresses: addresses.append(address)
+    if not addresses: raise ValueError('DNS sem endereço público')
+    return host,addresses
+
+def safe_url(url):
+    resolve_public(url)
     return url
 
-def get(url):
-    # No automatic redirects; validate every hop to prevent SSRF.
+class PinnedAdapter(requests.adapters.HTTPAdapter):
+    """Resolve once, connect to validated IP, preserve Host header and TLS SNI."""
+    def __init__(self, host, addresses, **kwargs):
+        self._host=host
+        self._addresses=addresses
+        super().__init__(**kwargs)
+
+    def get_connection_with_tls_context(self, request, verify, proxies=None, cert=None):
+        # Requests >=2.32 uses this method, not get_connection().
+        # Preserve original hostname for TLS verification, but connect to a
+        # DNS-validated public IP to prevent DNS rebinding after validation.
+        from urllib3 import HTTPSConnectionPool, HTTPConnectionPool
+        from requests.adapters import _urllib3_request_context
+        p=urlparse(request.url)
+        if p.hostname != self._host:
+            raise ValueError('Host inesperado na conexão')
+        host_params,pool_kwargs=_urllib3_request_context(request,verify,cert,self.poolmanager)
+        pool_cls=HTTPSConnectionPool if p.scheme=='https' else HTTPConnectionPool
+        kwargs={'host':self._addresses[0],
+                'port':p.port or (443 if p.scheme=='https' else 80),
+                'maxsize':1,'block':True}
+        if p.scheme=='https':
+            kwargs.update(server_hostname=self._host,assert_hostname=self._host)
+            kwargs.update(pool_kwargs)
+        return pool_cls(**kwargs)
+
+    def get_connection(self, url, proxies=None):
+        # Compatibility with Requests <2.32.
+        from urllib3 import HTTPSConnectionPool, HTTPConnectionPool
+        p=urlparse(url)
+        if p.hostname != self._host:
+            raise ValueError('Host inesperado na conexão')
+        pool_cls=HTTPSConnectionPool if p.scheme=='https' else HTTPConnectionPool
+        kw={'host':self._addresses[0],'port':p.port or (443 if p.scheme=='https' else 80),'maxsize':1,'block':True}
+        if p.scheme=='https':
+            kw.update(server_hostname=self._host,assert_hostname=self._host)
+        return pool_cls(**kw)
+
+def get_requests(url):
+    """Fetch using validated, pinned public IPs; retry alternate IPs on transport errors.
+
+    HTTP status errors are returned as-is, not interpreted as anti-bot blocks.
+    Every redirect gets fresh DNS validation; proxies and ambient credentials
+    remain disabled. Never fall back to unvalidated system DNS.
+    """
     for _ in range(5):
-        safe_url(url)
-        try:
-            with requests.get(url, timeout=(4,12), allow_redirects=False, stream=True, headers={'User-Agent':'RES-Studio/0.1 (read-only analysis)'}) as r:
-                if r.status_code in (301,302,303,307,308):
-                    url=urljoin(url,r.headers.get('Location',''))
-                    continue
-                r.raise_for_status()
-                data=bytearray()
-                for chunk in r.iter_content(65536):
-                    data.extend(chunk)
-                    if len(data)>MAX_FILE: raise ValueError('Arquivo excede 2 MB')
-                return bytes(data),r.headers.get('content-type',''),url
-        except requests.RequestException as e: raise ValueError(str(e))
+        host, addresses = resolve_public(url)
+        failures = []
+        redirect = None
+        for address in addresses[:4]:
+            session = requests.Session()
+            session.trust_env = False
+            adapter = PinnedAdapter(host, [address])
+            session.mount('http://', adapter)
+            session.mount('https://', adapter)
+            try:
+                with session.get(url, timeout=(4,12), allow_redirects=False,
+                                 stream=True, headers={'User-Agent':'RES-Studio/0.1 (read-only analysis)'}) as r:
+                    if r.status_code in (301,302,303,307,308):
+                        location = r.headers.get('Location')
+                        if not location: raise ValueError('Redirecionamento sem destino')
+                        redirect = urljoin(url,location)
+                        break
+                    if r.status_code >= 400:
+                        explanations={401:'Autenticação necessária',403:'Acesso negado pelo servidor (motivo não confirmado)',404:'Página não encontrada para esta requisição',429:'Limite de requisições do servidor',500:'Erro interno do site',502:'Gateway do site indisponível',503:'Serviço do site indisponível'}
+                        label=explanations.get(r.status_code,'Resposta HTTP de erro')
+                        raise ValueError(f'HTTP {r.status_code}: {label}. URL: {url[:200]}. O código HTTP não comprova bloqueio por bot.')
+                    data=bytearray()
+                    for chunk in r.iter_content(65536):
+                        data.extend(chunk)
+                        if len(data)>MAX_FILE: raise ValueError('Arquivo excede 2 MB')
+                    return bytes(data),r.headers.get('content-type',''),url
+            except requests.RequestException as exc:
+                failures.append(f'{address}: {type(exc).__name__}: {str(exc)[:120]}')
+            finally:
+                session.close()
+        if redirect is not None:
+            url = redirect
+            continue
+        raise ValueError('Falha de conexão em IPs públicos validados: '+'; '.join(failures)[:500])
     raise ValueError('Redirecionamentos excessivos')
+
+
+def get(url):
+    """Use pinned requests first; retry with pinned curl on HTTP/transport failure.
+
+    Never fall back on URL validation, body-size, or redirect-limit failures.
+    Set RES_HTTP_ENGINE=requests or curl to force one engine.
+    """
+    engine = os.environ.get('RES_HTTP_ENGINE', 'auto').lower()
+    if engine == 'curl':
+        from curl_transport import get as curl_get
+        return curl_get(url)
+    if engine == 'requests':
+        return get_requests(url)
+    if engine != 'auto':
+        raise ValueError('RES_HTTP_ENGINE inválido')
+    try:
+        return get_requests(url)
+    except ValueError as exc:
+        message = str(exc)
+        retryable = message.startswith(('HTTP 403:', 'HTTP 404:', 'HTTP 429:', 'Falha de conexão em IPs públicos validados:'))
+        if not retryable:
+            raise
+        from curl_transport import get as curl_get
+        return curl_get(url)
+
 
 class Assets(HTMLParser):
     def __init__(self): super().__init__(); self.urls=[]
@@ -170,23 +268,171 @@ def scan(s:Scan):
         return {'token':token,'url':final,'files':[{k:v for k,v in f.items() if k!='content'} for f in files], 'errors':errors,'truncated':len(entries)>MAX_ASSETS}
     except Exception as e: raise HTTPException(400,str(e))
 
+@app.post('/api/import-har')
+async def import_har(request: Request):
+    """Offline import of public HTML/CSS/JS response bodies from a user-supplied HAR.
+    
+    No network requests are made. Cookies, headers and request bodies are never stored.
+    """
+    import base64
+    limit = 16_000_000
+    data = bytearray()
+    async for chunk in request.stream():
+        data.extend(chunk)
+        if len(data) > limit:
+            raise HTTPException(413, 'HAR excede 16 MB')
+    try:
+        document = json.loads(data)
+        entries = document['log']['entries']
+        if not isinstance(entries, list):
+            raise ValueError('entries inválido')
+    except (ValueError, TypeError, KeyError) as exc:
+        raise HTTPException(400, 'Formato HAR inválido') from exc
+    files, errors, seen, total = [], [], set(), 0
+    for entry in entries[:1000]:
+        if len(files) >= MAX_ASSETS: break
+        try:
+            req = entry['request']
+            url = req['url']
+            parsed = urlparse(url)
+            if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password:
+                continue
+            response = entry['response']
+            if not 200 <= int(response.get('status', 0)) < 300: continue
+            body = response.get('content') or {}
+            mime = str(body.get('mimeType') or '').split(';', 1)[0].lower()
+            kind = ('html' if mime in ('text/html','application/xhtml+xml') else
+                    'css' if mime == 'text/css' else
+                    'js' if mime in ('application/javascript','text/javascript','application/ecmascript','text/ecmascript') else None)
+            if not kind or url in seen or not isinstance(body.get('text'), str): continue
+            if body.get('encoding') == 'base64':
+                raw = base64.b64decode(body['text'], validate=True)
+            elif body.get('encoding') in (None, ''):
+                raw = body['text'].encode('utf-8')
+            else: continue
+            if len(raw) > MAX_FILE or total + len(raw) > MAX_TOTAL: continue
+            seen.add(url)
+            total += len(raw)
+            content = raw.decode('utf-8', 'replace')
+            files.append({'id':len(files),'type':kind,'url':url,'size':len(raw),
+                          'content':content,'analysis':analyze(url,content)})
+        except (KeyError, ValueError, TypeError, UnicodeError) as exc:
+            if len(errors) < 20: errors.append('Entrada HAR ignorada: '+str(exc)[:100])
+    if not files:
+        raise HTTPException(422, 'HAR não contém corpos HTML, CSS ou JS utilizáveis. Exporte com conteúdo das respostas.')
+    token = store_session(files)
+    return {'token':token,'mode':'har','files':[{k:v for k,v in f.items() if k!='content'} for f in files],
+            'errors':errors,'truncated':len(entries)>1000 or len(files)>=MAX_ASSETS}
+
+
+@app.post('/api/scan-auto')
+def scan_auto(s: Scan):
+    """Try the normal scanner, then the isolated browser if explicitly enabled."""
+    failures = []
+    try:
+        result = scan(s)
+        result['mode'] = 'auto-http'
+        result['fallback_errors'] = failures
+        return result
+    except Exception as exc:
+        failures.append('HTTP: ' + str(getattr(exc, 'detail', exc))[:250])
+    if os.environ.get('RES_ENABLE_ISOLATED_CHROMIUM') != '1':
+        raise HTTPException(422, {'message':'Captura HTTP falhou; Chromium isolado desabilitado. Ative RES_ENABLE_ISOLATED_CHROMIUM=1 ou importe um HAR.', 'attempts':failures})
+    try:
+        result = scan_dynamic(s)
+        result['mode'] = 'auto-browser'
+        result['fallback_errors'] = failures
+        return result
+    except Exception as exc:
+        failures.append('Chromium: ' + str(getattr(exc, 'detail', exc))[:250])
+        raise HTTPException(422, {'message':'Nenhum método automático recuperou a página. O Chromium isolado usa o mesmo broker HTTP e pode receber o mesmo 404. Importe um HAR de navegador autorizado.', 'attempts':failures})
+
+
 @app.post('/api/scan-dynamic')
 def scan_dynamic(s:Scan):
     try:
-        try:
-            from playwright_scan import capture
-        except ImportError:
-            raise HTTPException(503, 'Instale Playwright: pip install -r requirements.txt && python -m playwright install chromium')
-        result=asyncio.run(capture(s.url,safe_url))
+        if os.environ.get('RES_ENABLE_ISOLATED_CHROMIUM') != '1':
+            raise HTTPException(503, 'Captura dinâmica desabilitada: configure worker Docker isolado e RES_ENABLE_ISOLATED_CHROMIUM=1.')
+        from isolated_chromium import capture
+        result=capture(s.url,get,safe_url)
         files=[]
         for asset in result['assets']:
             content=asset['content']
-            files.append({'id':len(files),'type':asset['type'],'url':asset['url'], 'size':asset['size'], 'content':content,'analysis':analyze(asset['url'],content)})
+            files.append({'id':len(files),'type':asset['type'],'url':asset['url'], 'size':asset['size'], 'content':content,'analysis':analyze(asset['url'],content),'rendered':asset.get('rendered',False)})
         if not files: raise ValueError('Nenhum recurso coletado. Verifique bloqueios e permissões do site.')
         token=store_session(files)
         return {'token':token,'url':result['url'],'files':[{k:v for k,v in f.items() if k!='content'} for f in files], 'errors':result['errors'],'truncated':result['truncated'], 'requests':result['requests'], 'mode':'dynamic'}
     except HTTPException: raise
     except Exception as exc: raise HTTPException(400,str(exc)[:500])
+
+class DeepScan(Scan):
+    max_assets: int = 500
+    max_pages: int = 10
+    max_total_mb: int = 100
+    max_depth: int = 3
+    same_origin: bool = True
+
+@app.post('/api/scan-deep')
+def scan_deep(s:DeepScan):
+    """Breadth-first public asset discovery; local API only."""
+    from deep_scan import discover
+    try:
+        if not 1 <= s.max_total_mb <= 1000:
+            raise ValueError('max_total_mb deve estar entre 1 e 1000')
+        result=discover(s.url,get,max_assets=s.max_assets,max_pages=s.max_pages,
+                        max_total_bytes=s.max_total_mb*1_000_000,
+                        max_depth=s.max_depth,same_origin=s.same_origin)
+        if not result['files']:
+            raise ValueError('Nenhum arquivo recuperado')
+        for f in result['files']:
+            f['analysis']=analyze(f['url'],f['content'])
+        token=store_session(result['files'])
+        return {'token':token,'url':s.url,'mode':'deep',
+                'files':[{k:v for k,v in f.items() if k!='content'} for f in result['files']],
+                'errors':result['errors'],'requests':result['requests'],
+                'truncated':result['truncated'],'total_bytes':result['total_bytes'],
+                'pages':result['pages'],'discovered_urls':result['discovered_urls']}
+    except Exception as exc:
+        raise HTTPException(400,str(exc)[:500])
+
+@app.post('/api/jobs/deep')
+def start_deep_job(s:DeepScan):
+    from deep_jobs import submit
+    try:
+        if not 1 <= s.max_total_mb <= 1000:
+            raise ValueError('max_total_mb deve estar entre 1 e 1000')
+        safe_url(s.url)
+        settings={'max_assets':s.max_assets,'max_pages':s.max_pages,
+                  'max_total_bytes':s.max_total_mb*1_000_000,
+                  'max_depth':s.max_depth,'same_origin':s.same_origin}
+        return {'token':submit(s.url,get,settings),'status':'running'}
+    except Exception as exc: raise HTTPException(400,str(exc)[:300])
+
+@app.get('/api/jobs/{token}')
+def deep_job_status(token:str):
+    from deep_jobs import status
+    try: return status(token)
+    except KeyError: raise HTTPException(404,'Tarefa não encontrada')
+
+@app.post('/api/jobs/{token}/cancel')
+def deep_job_cancel(token:str):
+    from deep_jobs import cancel
+    try: return cancel(token)
+    except KeyError: raise HTTPException(404,'Tarefa não encontrada')
+
+@app.get('/api/jobs/{token}/assets')
+def deep_job_assets(token:str,limit:int=100,offset:int=0):
+    from deep_jobs import assets
+    if not 1 <= limit <= 500 or offset < 0:
+        raise HTTPException(400,'Paginação inválida')
+    try: return {'assets':assets(token,limit,offset),'limit':limit,'offset':offset}
+    except KeyError: raise HTTPException(404,'Tarefa não encontrada')
+
+@app.get('/api/jobs/{token}/assets/{fid}')
+def deep_job_asset(token:str,fid:int):
+    from deep_jobs import asset
+    try: return asset(token,fid)
+    except KeyError: raise HTTPException(404,'Arquivo não encontrado')
 
 class Decompile(BaseModel):
     engine: str = 'webcrack'
@@ -346,3 +592,45 @@ def export(token:str):
         z.writestr('report.json',json.dumps(report,ensure_ascii=False,indent=2))
     mem.seek(0)
     return StreamingResponse(mem,media_type='application/zip',headers={'Content-Disposition':'attachment; filename="res-analysis.zip"'})
+
+
+@app.get('/api/jobs/{token}/export')
+def deep_export(token:str,mode:str='original'):
+    """Bounded ZIP of an authorized deep-scan session, with explicit provenance."""
+    if mode not in ('original','analyzed','reconstructed'):
+        raise HTTPException(400,'Modo de exportação inválido')
+    import deep_jobs
+    try:
+        state=deep_jobs.status(token)
+    except KeyError:
+        raise HTTPException(404,'Sessão não encontrada')
+    if state['status'] in ('queued','running'):
+        raise HTTPException(409,'Aguarde a conclusão da análise')
+    import sqlite3
+    from urllib.parse import urlsplit
+    mem=io.BytesIO()
+    report=[]
+    total=0
+    with zipfile.ZipFile(mem,'w',zipfile.ZIP_DEFLATED) as z:
+        with sqlite3.connect(deep_jobs._db(token)) as conn:
+            for fid,url,kind,size,content in conn.execute('SELECT id,url,type,size,content FROM assets ORDER BY id LIMIT 501'):
+                if len(report)>=500: break
+                content=content or ''
+                raw=content.encode('utf-8')
+                if total+len(raw)>25*1024*1024: break
+                total+=len(raw)
+                ext=kind if kind in ('html','css','js','json','svg','txt') else 'txt'
+                filename=f'assets/{fid:04d}.{ext}'
+                z.writestr(filename,raw)
+                entry={'id':fid,'url':url,'type':kind,'bytes':len(raw),'path':filename}
+                report.append(entry)
+                if mode in ('analyzed','reconstructed') and kind=='js':
+                    formatted=format_js(content)
+                    z.writestr(f'analyzed/{fid:04d}.js',formatted[:2_000_000])
+        z.writestr('report.json',json.dumps({'mode':mode,'assets':report,'status':state['status'],
+            'errors':state.get('errors',[]),'truncated':state.get('truncated',False)},ensure_ascii=False,indent=2))
+        if mode=='reconstructed':
+            z.writestr('README.txt','RES Studio - reconstrução parcial offline\\nOs arquivos preservam nomes numerados. URLs e dependências externas podem não funcionar.\\nBackend, banco de dados, código-fonte original e funcionalidades privadas não são recuperados.\\nConsulte report.json para URLs originais.\\n')
+    mem.seek(0)
+    return StreamingResponse(mem,media_type='application/zip',
+        headers={'Content-Disposition':f'attachment; filename="res-deep-{mode}.zip"'})

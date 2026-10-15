@@ -1,0 +1,188 @@
+name: RES live HTTP diagnostic
+on:
+  push:
+    branches: [release-hardening]
+    paths: ['.github/workflows/res-live-http-diagnostic.yml']
+  workflow_dispatch:
+jobs:
+  public-http-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Check real RES HTTP transport
+        env:
+          TARGET_URL: https://drivedacrisoficial.com/loja/
+        run: |
+          python - <<'PY'
+          import socket,os
+          from urllib.parse import urlparse
+          from server import get,resolve_public
+          url=os.environ['TARGET_URL']
+          host=urlparse(url).hostname
+          try:
+              name,ips=resolve_public(url)
+              print('DNS validated:',name,'public addresses:',len(ips))
+          except Exception as exc:
+              print('DNS validation failed:',type(exc).__name__,str(exc)[:300])
+              raise SystemExit(1)
+          try:
+              data,mime,final=get(url)
+              print('RES_HTTP_SUCCESS', 'bytes:',len(data),'content-type:',mime[:100],'final-host:',urlparse(final).hostname)
+          except Exception as exc:
+              print('RES_HTTP_FAILED',type(exc).__name__,str(exc)[:500])
+              raise SystemExit(1)
+          PY
+
+      - name: Compare pinned HTTP request variants
+        if: always()
+        env:
+          TARGET_URL: https://drivedacrisoficial.com/loja/
+        run: |
+          python - <<'PY'
+          import os,requests
+          from server import resolve_public,PinnedAdapter
+          url=os.environ['TARGET_URL']
+          host,ips=resolve_public(url)
+          print('Public IP count:',len(ips))
+          variants=[('RES default','RES-Studio/0.1 (read-only analysis)'),('Browser-like','Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/125.0 Safari/537.36')]
+          for ip in ips[:4]:
+            for label,ua in variants:
+              s=requests.Session()
+              s.trust_env=False
+              s.mount('https://',PinnedAdapter(host,[ip]))
+              s.mount('http://',PinnedAdapter(host,[ip]))
+              try:
+                with s.get(url,headers={'User-Agent':ua,'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'},allow_redirects=False,timeout=(4,12),stream=True) as r:
+                  print(label,'IP:',ip,'status:',r.status_code,'type:',r.headers.get('content-type','')[:80])
+              except requests.RequestException as e:
+                print(label,'IP:',ip,'transport:',type(e).__name__)
+              finally:
+                s.close()
+          PY
+
+      - name: Compare domain root and storefront paths
+        if: always()
+        run: |
+          python - <<'PY'
+          from server import resolve_public,PinnedAdapter
+          import requests
+          urls=['https://drivedacrisoficial.com/','https://drivedacrisoficial.com/loja/','https://www.drivedacrisoficial.com/','https://www.drivedacrisoficial.com/loja/']
+          for url in urls:
+            try:
+              host,ips=resolve_public(url)
+              for ip in ips[:2]:
+                s=requests.Session()
+                s.trust_env=False
+                s.mount('https://',PinnedAdapter(host,[ip]))
+                try:
+                  with s.get(url,allow_redirects=False,stream=True,timeout=(4,12),headers={'User-Agent':'RES-Studio/0.1 (read-only analysis)'}) as r:
+                    print('URL:',url,'IP:',ip,'status:',r.status_code,'location:',r.headers.get('Location','')[:120],'type:',r.headers.get('Content-Type','')[:80])
+                except requests.RequestException as exc:
+                  print('URL:',url,'IP:',ip,'transport:',type(exc).__name__)
+                finally:
+                  s.close()
+            except Exception as exc:
+              print('URL:',url,'validation:',type(exc).__name__,str(exc)[:100])
+          PY
+
+      - name: Experimental curl_cffi connectivity comparison
+        if: always()
+        run: |
+          pip install 'curl_cffi>=0.11,<1'
+          python - <<'PY'
+          from curl_cffi import requests as crequests
+          from server import resolve_public
+          url='https://drivedacrisoficial.com/loja/'
+          host,ips=resolve_public(url)
+          print('Validated public DNS addresses:',len(ips))
+          for profile in ('chrome','firefox'):
+            try:
+              response=crequests.get(url,impersonate=profile,timeout=12,allow_redirects=False)
+              print('curl_cffi profile:',profile,'status:',response.status_code,'type:',response.headers.get('content-type','')[:70])
+            except Exception as exc:
+              print('curl_cffi profile:',profile,'error:',type(exc).__name__)
+          PY
+
+      - name: Validate opt-in DNS-pinned curl transport
+        if: always()
+        env:
+          RES_HTTP_ENGINE: curl
+        run: |
+          python - <<'PY'
+          from server import get
+          url='https://drivedacrisoficial.com/loja/'
+          data,mime,final=get(url)
+          print('PINNED_CURL_SUCCESS',len(data),mime[:90],final)
+          assert data and ('html' in mime.lower() or b'<html' in data[:500].lower())
+          PY
+
+      - name: Compare pinned curl transport on other public sites
+        if: always()
+        env:
+          RES_HTTP_ENGINE: curl
+        run: |
+          python - <<'PY'
+          from server import get
+          targets=['https://example.com/','https://www.python.org/','https://www.wikipedia.org/','https://drivedacrisoficial.com/loja/']
+          for url in targets:
+            try:
+              data,mime,final=get(url)
+              print('MULTISITE_SUCCESS',url,'bytes',len(data),'mime',mime[:70])
+            except Exception as exc:
+              print('MULTISITE_FAILED',url,type(exc).__name__,str(exc)[:220])
+          PY
+
+      - name: Verify full RES Studio scan of storefront
+        env:
+          RES_HTTP_ENGINE: curl
+        run: |
+          python - <<'PY'
+          from server import scan,Scan,SESSION
+          result=scan(Scan(url='https://drivedacrisoficial.com/loja/'))
+          files=result['files']
+          print('SCAN_SUCCESS','files:',len(files),'types:',sorted({f['type'] for f in files}),'errors:',len(result['errors']),'truncated:',result['truncated'])
+          assert files and files[0]['type']=='html'
+          assert len(files)>1, 'Only HTML was captured'
+          PY
+      - name: Automatic transport regression tests
+        run: python -m unittest discover -s tests -p 'test_auto_transport.py' -v
+
+      - name: Compare real ecommerce storefront
+        env:
+          RES_HTTP_ENGINE: auto
+        run: |
+          python - <<'PY'
+          from server import scan,Scan
+          url='https://www.cacaushow.com.br/'
+          try:
+              result=scan(Scan(url=url))
+              files=result['files']
+              types=sorted({f['type'] for f in files})
+              print('ECOMMERCE_SCAN_SUCCESS',url,'files',len(files),'types',types,'errors',len(result['errors']),'truncated',result['truncated'])
+              assert files and files[0]['type']=='html'
+          except Exception as exc:
+              print('ECOMMERCE_SCAN_FAILED',url,type(exc).__name__,str(exc)[:400])
+              raise
+          PY
+
+      - name: Validate bounded deep scan on real storefront
+        env:
+          RES_HTTP_ENGINE: curl
+        run: |
+          python - <<'PY'
+          from server import scan_deep, DeepScan
+          url='https://drivedacrisoficial.com/loja/'
+          try:
+              result=scan_deep(DeepScan(url=url,max_assets=65,max_pages=1,max_total_mb=20,max_depth=1,same_origin=True))
+              files=result['files']
+              print('DEEP_SCAN_SUCCESS','files',len(files),'types',sorted({f['type'] for f in files}),'errors',len(result.get('errors',[])),'truncated',result.get('truncated'))
+              assert files and any(f['type']=='html' for f in files)
+          except Exception as exc:
+              print('DEEP_SCAN_FAILED',type(exc).__name__,str(exc)[:400])
+              raise
+          PY

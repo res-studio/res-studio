@@ -4,12 +4,20 @@ services:
     ports:
       - "127.0.0.1:8765:8765"
     read_only: true
+    environment:
+      RES_JOB_DIR: /data/jobs
+      RES_API_KEY: ${RES_API_KEY:-}
+    volumes:
+      - res-studio-jobs:/data/jobs
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
     pids_limit: 128
-    mem_limit: 512m
+    mem_limit: 1g
     tmpfs:
       - /tmp:size=64m,noexec,nosuid
     restart: "no"
+
+volumes:
+  res-studio-jobs:

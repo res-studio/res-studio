@@ -1,0 +1,52 @@
+name: RES dependency license inventory
+on:
+  push:
+    branches: [main, release-hardening]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  license-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies and inventory tooling
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund license-checker
+          python -m pip install -r requirements.txt pip-licenses
+      - name: Record dependency licenses
+        run: |
+          mkdir -p license-reports
+          ./node_modules/.bin/license-checker --production --json > license-reports/npm-licenses.json
+          python -m piplicenses --format=json --output-file=license-reports/python-licenses.json
+          python - <<'PY'
+          import json
+          with open('license-reports/npm-licenses.json') as f: npm=json.load(f)
+          with open('license-reports/python-licenses.json') as f: py=json.load(f)
+          print('Node dependencies:',len(npm))
+          print('Python environment packages:',len(py))
+          for name,info in sorted(npm.items()):
+              license=str(info.get('licenses','UNKNOWN'))
+              if any(flag in license.upper() for flag in ('GPL','AGPL','UNKNOWN','UNLICENSED')):
+                  print('REVIEW NODE',name,license)
+          for pkg in py:
+              license=str(pkg.get('License','UNKNOWN'))
+              if any(flag in license.upper() for flag in ('GPL','AGPL','UNKNOWN','UNLICENSED')):
+                  print('REVIEW PYTHON',pkg.get('Name'),license)
+          PY
+      - name: Upload reviewable license inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-license-inventory
+          path: license-reports/
+          retention-days: 30

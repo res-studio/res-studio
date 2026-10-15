@@ -1,7 +1,7 @@
 name: RES Security Regression
 on:
   push:
-    branches: [main]
+    branches: [main, release-hardening]
     paths:
       - '**'
       - '.github/workflows/res-security.yml'
@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install dependencies
@@ -22,4 +22,7 @@ jobs:
         run: python -m pip install -r requirements.txt httpx
       - name: Run SSRF and resource-limit regressions
         working-directory: .
-        run: python -m unittest discover -s tests -p 'test_security.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_security.py' -v
+          python -m unittest discover -s tests -p 'test_deep_scan.py' -v
+          python -m unittest discover -s tests -p 'test_deep_jobs.py' -v

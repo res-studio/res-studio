@@ -1,0 +1,59 @@
+name: RES Release Candidate Gate
+on:
+  push:
+    branches: [release-hardening]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt httpx
+      - name: Python syntax validation
+        run: python -m compileall -q server.py deep_scan.py deep_jobs.py playwright_scan.py tests
+      - name: Install Chromium for dynamic integration tests
+        run: python -m playwright install --with-deps chromium
+      - name: Regression suite
+        run: python -m unittest discover -s tests -v
+      - name: Docker build
+        run: docker build -t res-studio:release-candidate .
+      - name: Build isolated Chromium image
+        run: docker build -f Dockerfile.chromium -t res-studio-chromium:local .
+      - name: Isolated Chromium end-to-end smoke test
+        run: |
+          python - <<'PY'
+          import isolated_chromium
+          base='https://fixture.example'
+          def validate(url):
+              if url not in (base,base+'/'): raise ValueError('Unapproved URL')
+          def fetch(url):
+              if url in (base,base+'/'): return b'<html><title>RES</title></html>', 'text/html',url
+              raise ValueError('Unapproved asset')
+          result=isolated_chromium.capture(base,fetch,validate)
+          assert not result['errors'], result
+          assert result['assets'], result
+          assert result['assets'][0]['type']=='html', result
+          print('Isolated Chromium captured public fixture via broker')
+          PY
+      - name: Docker compose validation
+        run: docker compose config --quiet
+      - name: Container API smoke test
+        run: |
+          export RES_API_KEY=ci-test-key
+          docker compose up -d --build
+          trap 'docker compose down --volumes' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS -H 'x-api-key: ci-test-key' http://127.0.0.1:8765/api/engines >/dev/null
+          curl -fsS http://127.0.0.1:8765/ | grep -q 'Análise profunda'
