@@ -6,6 +6,7 @@ services:
     read_only: true
     environment:
       RES_JOB_DIR: /data/jobs
+      RES_API_KEY: ${RES_API_KEY:-}
     volumes:
       - res-studio-jobs:/data/jobs
     security_opt:
