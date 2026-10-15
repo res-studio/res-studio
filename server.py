@@ -294,6 +294,12 @@ def deep_job_status(token:str):
     try: return status(token)
     except KeyError: raise HTTPException(404,'Tarefa não encontrada')
 
+@app.post('/api/jobs/{token}/cancel')
+def deep_job_cancel(token:str):
+    from deep_jobs import cancel
+    try: return cancel(token)
+    except KeyError: raise HTTPException(404,'Tarefa não encontrada')
+
 @app.get('/api/jobs/{token}/assets')
 def deep_job_assets(token:str,limit:int=100,offset:int=0):
     from deep_jobs import assets
