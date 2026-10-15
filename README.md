@@ -19,7 +19,7 @@ A local-first, open-source toolkit for authorized website asset inspection and J
 ---
 
 > [!IMPORTANT]
-> RES Studio is **pre-release software for local, authorized use**. Do not expose the API to the public internet. DNS-pinned connections have regression coverage, but operating-system egress isolation for Chromium is not implemented.
+> RES Studio is **pre-release software for local, authorized use**. Do not expose the API to the public internet. DNS-pinned connections have regression coverage, but Chromium egress isolation requires an explicitly enabled Docker worker; it is not included in the minimal app container.
 
 ## Features
 
@@ -47,7 +47,18 @@ uvicorn server:app --host 127.0.0.1 --port 8765
 
 Open **http://127.0.0.1:8765**.
 
-Optional JavaScript engines: install Node.js 22+ and run `npm install` in the same directory. Optional browser capture: run `python -m playwright install chromium`.
+Optional JavaScript engines: install Node.js 22+ and run `npm install` in the same directory. For isolated dynamic capture, build the separate Chromium image and run the Python API on the host with Docker installed (instructions below).
+
+### Isolated Chromium dynamic capture
+
+The browser executes in a separate Docker container with **no network interface**. Its only way to receive approved HTTP content is the parent-side, URL-validated fetch broker over standard input/output. Docker must be installed on the same host as the Python API.
+
+```bash
+docker build -f Dockerfile.chromium -t res-studio-chromium:local .
+RES_ENABLE_ISOLATED_CHROMIUM=1 uvicorn server:app --host 127.0.0.1 --port 8765
+```
+
+Use the **Playwright** button in the interface. The parent requires Docker CLI access and creates a short-lived worker with `--network none`, read-only filesystem, non-root user, restricted capabilities, and resource limits. **Do not mount the Docker socket inside the main API container** to enable this; run the API locally on the host instead. The basic `docker compose up` deployment keeps dynamic capture disabled. Do not use the legacy `RES_ENABLE_UNISOLATED_BROWSER` flag.
 
 ### Minimal Docker setup
 
@@ -67,7 +78,7 @@ See [Release checklist](RELEASE_CHECKLIST.md) for the outstanding security, lice
 
 - [x] DNS-pinned HTTP connections (Requests 2.32+; regression tested)
 - [ ] Operating-system network egress filtering
-- [ ] Isolated Chromium worker
+- [x] Network-disconnected Chromium Docker worker and validated stdio fetch broker (release CI validation pending)
 - [ ] Fully validated container distribution with optional engines
 - [x] Standalone public repository
 - [ ] License review
