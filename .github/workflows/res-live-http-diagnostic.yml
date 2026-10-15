@@ -136,3 +136,18 @@ jobs:
             except Exception as exc:
               print('MULTISITE_FAILED',url,type(exc).__name__,str(exc)[:220])
           PY
+
+      - name: Verify full RES Studio scan of storefront
+        env:
+          RES_HTTP_ENGINE: curl
+        run: |
+          python - <<'PY'
+          from server import scan,Scan,SESSION
+          result=scan(Scan(url='https://drivedacrisoficial.com/loja/'))
+          files=result['files']
+          print('SCAN_SUCCESS','files:',len(files),'types:',sorted({f['type'] for f in files}),'errors:',len(result['errors']),'truncated:',result['truncated'])
+          assert files and files[0]['type']=='html'
+          assert len(files)>1, 'Only HTML was captured'
+          PY
+      - name: Automatic transport regression tests
+        run: python -m unittest discover -s tests -p 'test_auto_transport.py' -v
