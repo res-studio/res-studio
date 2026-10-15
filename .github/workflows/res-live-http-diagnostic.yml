@@ -89,3 +89,21 @@ jobs:
             except Exception as exc:
               print('URL:',url,'validation:',type(exc).__name__,str(exc)[:100])
           PY
+
+      - name: Experimental curl_cffi connectivity comparison
+        if: always()
+        run: |
+          pip install 'curl_cffi>=0.11,<1'
+          python - <<'PY'
+          from curl_cffi import requests as crequests
+          from server import resolve_public
+          url='https://drivedacrisoficial.com/loja/'
+          host,ips=resolve_public(url)
+          print('Validated public DNS addresses:',len(ips))
+          for profile in ('chrome','firefox'):
+            try:
+              response=crequests.get(url,impersonate=profile,timeout=12,allow_redirects=False)
+              print('curl_cffi profile:',profile,'status:',response.status_code,'type:',response.headers.get('content-type','')[:70])
+            except Exception as exc:
+              print('curl_cffi profile:',profile,'error:',type(exc).__name__)
+          PY
