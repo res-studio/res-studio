@@ -26,6 +26,23 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Docker build
         run: docker build -t res-studio:release-candidate .
+      - name: Build isolated Chromium image
+        run: docker build -f Dockerfile.chromium -t res-studio-chromium:local .
+      - name: Isolated Chromium end-to-end smoke test
+        run: |
+          python - <<'PY'
+          import isolated_chromium
+          base='https://fixture.example'
+          def validate(url):
+              if not url.startswith(base): raise ValueError('Unapproved URL')
+          def fetch(url):
+              if url == base: return b'<html><title>RES</title></html>', 'text/html',url
+              raise ValueError('Unapproved asset')
+          result=isolated_chromium.capture(base,fetch,validate)
+          assert result['assets'], result
+          assert result['assets'][0]['type']=='html', result
+          print('Isolated Chromium captured public fixture via broker')
+          PY
       - name: Docker compose validation
         run: docker compose config --quiet
       - name: Container API smoke test
