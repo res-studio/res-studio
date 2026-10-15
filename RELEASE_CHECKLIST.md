@@ -6,7 +6,7 @@ This repository is public, but a public repository is not the same as a safe pub
 
 - [ ] Review tracked files and repository history for credentials and private data.
 - [ ] Review direct and transitive dependency licenses (including indirect dependencies; unused direct deobfuscator was removed).
-- [ ] Select and add an appropriate project LICENSE; do not assume MIT covers third-party dependencies.
+- [x] Select and add an MIT LICENSE for original RES Studio source code; third-party licenses remain separate.
 - [x] Pin DNS resolution to validated public IP addresses in the static scanner, including redirects (Requests 2.32+ regression test).
 - [x] Implement network-disconnected Docker Chromium worker (`--network none`) with parent-side validated fetch broker; Docker end-to-end CI passed at commit 813b7e22.
 - [ ] Add regression tests for DNS rebinding, redirects and browser network access.
@@ -20,7 +20,7 @@ Run locally on 127.0.0.1; do not expose the API to the public internet. Only ins
 
 ## Open-source licensing
 
-The project's own license has **not yet been selected**. The README's older references to MIT are historical and not evidence that a LICENSE file exists. Review third-party license obligations before distribution decisions.
+The project's original code is now licensed under [MIT](LICENSE). Third-party dependencies and website resources retain their own rights; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The automated inventory is not a substitute for reviewing transitive license obligations before bundled distribution.
 
 ## Release-candidate implementation notes
 
