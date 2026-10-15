@@ -47,6 +47,15 @@ class SecurityTest(unittest.TestCase):
   self.assertEqual(pool.conn_kw['server_hostname'],'example.com')
   with self.assertRaises(ValueError):
    adapter.get_connection('https://other.example/path')
+ def test_pinned_connection_requests_232_path(self):
+  from requests import Request
+  adapter=server.PinnedAdapter('example.com',['93.184.215.14'])
+  prepared=Request('GET','https://example.com/path').prepare()
+  pool=adapter.get_connection_with_tls_context(prepared,True)
+  self.assertEqual(pool.host,'93.184.215.14')
+  self.assertEqual(pool.conn_kw['server_hostname'],'example.com')
+  with self.assertRaises(ValueError):
+   adapter.get_connection_with_tls_context(Request('GET','https://other.example/').prepare(),True)
  def test_proxy_environment_disabled(self):
   response=MagicMock()
   response.__enter__.return_value=response
