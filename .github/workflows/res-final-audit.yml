@@ -22,6 +22,8 @@ jobs:
           /tmp/res-clean/bin/python -m pip install -r requirements-mcp.txt httpx
           /tmp/res-clean/bin/python -m pip check
           /tmp/res-clean/bin/python -c "import server, mcp_server; print('Clean install OK')"
+      - name: Install browser for integration tests
+        run: /tmp/res-clean/bin/python -m playwright install --with-deps chromium
       - name: Security tests
         run: /tmp/res-clean/bin/python -m unittest discover -s tests -v
       - name: Source secret patterns (tracked files)
