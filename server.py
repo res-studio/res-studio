@@ -228,6 +228,63 @@ def scan(s:Scan):
         return {'token':token,'url':final,'files':[{k:v for k,v in f.items() if k!='content'} for f in files], 'errors':errors,'truncated':len(entries)>MAX_ASSETS}
     except Exception as e: raise HTTPException(400,str(e))
 
+@app.post('/api/import-har')
+async def import_har(request: Request):
+    """Offline import of public HTML/CSS/JS response bodies from a user-supplied HAR.
+    
+    No network requests are made. Cookies, headers and request bodies are never stored.
+    """
+    import base64
+    limit = 16_000_000
+    data = bytearray()
+    async for chunk in request.stream():
+        data.extend(chunk)
+        if len(data) > limit:
+            raise HTTPException(413, 'HAR excede 16 MB')
+    try:
+        document = json.loads(data)
+        entries = document['log']['entries']
+        if not isinstance(entries, list):
+            raise ValueError('entries inválido')
+    except (ValueError, TypeError, KeyError) as exc:
+        raise HTTPException(400, 'Formato HAR inválido') from exc
+    files, errors, seen, total = [], [], set(), 0
+    for entry in entries[:1000]:
+        if len(files) >= MAX_ASSETS: break
+        try:
+            req = entry['request']
+            url = req['url']
+            parsed = urlparse(url)
+            if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password:
+                continue
+            response = entry['response']
+            if not 200 <= int(response.get('status', 0)) < 300: continue
+            body = response.get('content') or {}
+            mime = str(body.get('mimeType') or '').split(';', 1)[0].lower()
+            kind = ('html' if mime in ('text/html','application/xhtml+xml') else
+                    'css' if mime == 'text/css' else
+                    'js' if mime in ('application/javascript','text/javascript','application/ecmascript','text/ecmascript') else None)
+            if not kind or url in seen or not isinstance(body.get('text'), str): continue
+            if body.get('encoding') == 'base64':
+                raw = base64.b64decode(body['text'], validate=True)
+            elif body.get('encoding') in (None, ''):
+                raw = body['text'].encode('utf-8')
+            else: continue
+            if len(raw) > MAX_FILE or total + len(raw) > MAX_TOTAL: continue
+            seen.add(url)
+            total += len(raw)
+            content = raw.decode('utf-8', 'replace')
+            files.append({'id':len(files),'type':kind,'url':url,'size':len(raw),
+                          'content':content,'analysis':analyze(url,content)})
+        except (KeyError, ValueError, TypeError, UnicodeError) as exc:
+            if len(errors) < 20: errors.append('Entrada HAR ignorada: '+str(exc)[:100])
+    if not files:
+        raise HTTPException(422, 'HAR não contém corpos HTML, CSS ou JS utilizáveis. Exporte com conteúdo das respostas.')
+    token = store_session(files)
+    return {'token':token,'mode':'har','files':[{k:v for k,v in f.items() if k!='content'} for f in files],
+            'errors':errors,'truncated':len(entries)>1000 or len(files)>=MAX_ASSETS}
+
+
 @app.post('/api/scan-dynamic')
 def scan_dynamic(s:Scan):
     try:
