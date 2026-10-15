@@ -31,9 +31,10 @@ def _run(token,url,fetch,settings):
             with LOCK:
                 JOBS[token]['count']+=1
                 JOBS[token]['bytes']+=asset['size']
-        result=discover(url,fetch,on_asset=save,retain_content=False,**settings)
+        result=discover(url,fetch,on_asset=save,retain_content=False,
+                        should_stop=lambda: JOBS[token]['cancel_requested'],**settings)
         with LOCK:
-            JOBS[token].update(status='completed',errors=result['errors'][:100],
+            JOBS[token].update(status='cancelled' if JOBS[token]['cancel_requested'] else 'completed',errors=result['errors'][:100],
                                truncated=result['truncated'],pages=result['pages'],
                                discovered_urls=result['discovered_urls'])
     except Exception as exc:
@@ -51,7 +52,7 @@ def submit(url,fetch,settings):
         if len(JOBS)>=MAX_JOBS: raise ValueError('Fila cheia; tente mais tarde')
         token=secrets.token_hex(16)
         _initialize(token)
-        JOBS[token]={'status':'queued','created':now,'count':0,'bytes':0,
+        JOBS[token]={'status':'queued','created':now,'count':0,'bytes':0,'cancel_requested':False,
                      'errors':[],'truncated':False,'pages':0,'discovered_urls':0}
         EXECUTOR.submit(_run,token,url,fetch,settings)
         return token
@@ -75,3 +76,11 @@ def asset(token,fid):
         row=conn.execute('SELECT * FROM assets WHERE id=?',(fid,)).fetchone()
         if row is None: raise KeyError(fid)
         return dict(row)
+
+def cancel(token):
+    with LOCK:
+        if token not in JOBS: raise KeyError(token)
+        job=JOBS[token]
+        if job['status'] in ('queued','running'):
+            job['cancel_requested']=True
+        return {'token':token,'status':job['status'],'cancel_requested':job['cancel_requested']}
