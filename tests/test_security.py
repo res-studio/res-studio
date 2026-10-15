@@ -26,19 +26,37 @@ class SecurityTest(unittest.TestCase):
   response.__enter__.return_value=response
   response.status_code=302
   response.headers={'Location':'http://127.0.0.1/secret'}
-  with patch.object(server,'safe_url',wraps=server.safe_url) as validator:
-   with patch.object(server.requests,'get',return_value=response):
+  with patch.object(server,'resolve_public',side_effect=[('example.com',['93.184.215.14']),ValueError('private')]) as validator:
+   with patch.object(server.requests.Session,'get',return_value=response):
     with self.assertRaises(ValueError):server.get('https://example.com')
-    self.assertGreaterEqual(validator.call_count,2)
+    self.assertEqual(validator.call_count,2)
  def test_streaming_file_size_limit(self):
   response=MagicMock()
   response.__enter__.return_value=response
   response.status_code=200
   response.headers={'content-type':'text/html'}
   response.iter_content.return_value=[b'x'*(server.MAX_FILE+1)]
-  with patch.object(server.requests,'get',return_value=response):
-   with self.assertRaisesRegex(ValueError,'2 MB'):
-    server.get('https://example.com')
+  with patch.object(server,'resolve_public',return_value=('example.com',['93.184.215.14'])):
+   with patch.object(server.requests.Session,'get',return_value=response):
+    with self.assertRaisesRegex(ValueError,'2 MB'):
+     server.get('https://example.com')
+ def test_pinned_connection_uses_validated_address(self):
+  adapter=server.PinnedAdapter('example.com',['93.184.215.14'])
+  pool=adapter.get_connection('https://example.com/path')
+  self.assertEqual(pool.host,'93.184.215.14')
+  self.assertEqual(pool.conn_kw['server_hostname'],'example.com')
+  with self.assertRaises(ValueError):
+   adapter.get_connection('https://other.example/path')
+ def test_proxy_environment_disabled(self):
+  response=MagicMock()
+  response.__enter__.return_value=response
+  response.status_code=200
+  response.headers={'content-type':'text/html'}
+  response.iter_content.return_value=[b'ok']
+  with patch.object(server,'resolve_public',return_value=('example.com',['93.184.215.14'])):
+   with patch.object(server.requests.Session,'get',return_value=response) as fetch:
+    self.assertEqual(server.get('https://example.com')[0],b'ok')
+    self.assertFalse(fetch.call_args.kwargs['allow_redirects'])
  def test_non_js_rejected_and_invalid_token(self):
   server.SESSION['t']=[{'type':'html','content':'<h1>test</h1>'}]
   self.assertEqual(self.client.post('/api/decompile/t/0',json={'engine':'wakaru'}).status_code,400)
@@ -78,9 +96,6 @@ class SecurityTest(unittest.TestCase):
    response=self.client.post('/api/scan-dynamic',json={'url':'https://example.com'})
   self.assertEqual(response.status_code,503)
   self.assertIn('desabilitada',response.json()['detail'])
- def test_dns_rebinding_risk_is_documented(self):
-  # Regression sentinel: safe_url validation alone does not pin requests DNS.
-  self.assertTrue(callable(server.safe_url))
  def test_reject_fragment(self):
   with self.assertRaises(ValueError):
    server.safe_url('https://example.com/#secret')
