@@ -77,8 +77,8 @@ See [Release checklist](RELEASE_CHECKLIST.md) for the outstanding security, lice
 ## Roadmap
 
 - [x] DNS-pinned HTTP connections (Requests 2.32+; regression tested)
-- [ ] Operating-system network egress filtering
-- [x] Network-disconnected Chromium Docker worker and validated stdio fetch broker (release CI validation pending)
+- [x] Operating-system network egress filtering for the optional Chromium worker (`--network none`); static scanner uses pinned-IP HTTP
+- [x] Network-disconnected Chromium Docker worker and validated stdio fetch broker (release CI passed at 813b7e22)
 - [ ] Fully validated container distribution with optional engines
 - [x] Standalone public repository
 - [ ] License review
