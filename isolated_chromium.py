@@ -33,7 +33,7 @@ def capture(url,fetch,validator):
                 continue
             line=proc.stdout.readline()
             if not line:break
-            if len(line)>2_000_000:raise RuntimeError('Mensagem do worker excessiva')
+            if len(line)>16_000_000:raise RuntimeError('Mensagem do worker excessiva')
             if line.startswith('RESREQ '):
                 count+=1
                 answer={}
