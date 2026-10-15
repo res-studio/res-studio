@@ -12,7 +12,7 @@ A local-first, open-source toolkit for authorized website asset inspection and J
 ![Status](https://img.shields.io/badge/status-pre--release-orange)
 ![Scope](https://img.shields.io/badge/deployment-local--only-blue)
 
-[Quick start](#quick-start) · [Features](#features) · [Security](SECURITY.md) · [License](LICENSE) · [Contributing](CONTRIBUTING.md)
+[Quick start](#quick-start) · [MCP](MCP.md) · [Features](#features) · [Security](SECURITY.md) · [License](LICENSE) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -79,6 +79,10 @@ RES Studio is a **software analysis and decompilation aid**, not a hosting servi
 **You are responsible for the targets you inspect and how you use the results.** Only analyze websites and assets you own or are authorized to inspect. Respect applicable laws, contracts, intellectual-property rights, privacy and website terms. The RES Studio contributors do not endorse unauthorized reverse engineering, and, to the extent permitted by applicable law, disclaim responsibility for independent misuse of the tool or resulting websites. This notice does not eliminate liability that cannot legally be excluded.
 
 The software is supplied **“AS IS”**, without warranties, as stated in the [MIT License](LICENSE).
+
+## AI agent integration (MCP)
+
+An optional local stdio MCP adapter lets compatible agents use bounded static/dynamic capture and deep-scan tools. Install `requirements-mcp.txt` and follow [MCP setup and safety notes](MCP.md). It does not run an AI model locally and is not exposed as a public server.
 
 ## Contribute
 
