@@ -19,3 +19,12 @@ The HTTP scanner validates public DNS answers and uses a pinned-IP connection ad
 Do not publish a working exploit in a public issue. Contact the repository owner privately using GitHub's private vulnerability reporting feature if enabled. Otherwise request a private contact channel without disclosing exploit details.
 
 Security fixes require targeted regression tests and GitHub Actions verification before release.
+
+## Responsible use and disclaimer
+
+RES Studio is a **software analysis and decompilation aid**, not a hosting service or the operator of any website being inspected. It helps users inspect accessible HTML, CSS, JavaScript and related assets; it does not grant permission to copy, republish, impersonate or commercially exploit third-party websites.
+
+**You are responsible for the targets you inspect and how you use the results.** Only analyze websites and assets you own or are authorized to inspect. Respect applicable laws, contracts, intellectual-property rights, privacy and website terms. The RES Studio contributors do not endorse unauthorized reverse engineering, and, to the extent permitted by applicable law, disclaim responsibility for independent misuse of the tool or resulting websites. This notice does not eliminate liability that cannot legally be excluded.
+
+The software is supplied **“AS IS”**, without warranties, as stated in the [MIT License](LICENSE).
+
