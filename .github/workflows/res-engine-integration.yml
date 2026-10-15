@@ -1,0 +1,32 @@
+name: RES v0.7 Engine Integration
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  engine-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install RES v0.7 dependencies
+        run: npm install --no-audit --no-fund
+      - name: Syntax test
+        run: npm test
+      - name: Run real Webcrack engine
+        run: |
+          printf 'var x = 1 + 2; console.log(x);' > input.js
+          node engine.mjs webcrack input.js output.json
+          node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("output.json"));if(r.error||typeof r.code!=="string")throw Error(JSON.stringify(r));console.log("Webcrack integration OK",r.code)'
+      - name: Check Wakaru implementation status
+        run: |
+          node engine.mjs wakaru input.js wakaru.json
+          node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("wakaru.json"));if(!r.error)throw Error("Unexpected status");console.log("Wakaru not yet integrated:",r.error)'
