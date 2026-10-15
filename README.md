@@ -1,25 +1,34 @@
 <div align="center">
 
-# RES Studio
+<img src="assets/res-banner.svg" alt="RES Studio — Explore assets, decode bundles, understand the web" width="100%" />
 
-**Explore web assets. Understand JavaScript bundles. Inspect what your browser loads.**
+<br />
 
-A local-first, open-source toolkit for authorized website asset inspection and JavaScript analysis.
+[![Latest release](https://img.shields.io/github/v/release/res-studio/res-studio?include_prereleases&style=for-the-badge&label=RELEASE&color=7C6CFF)](https://github.com/res-studio/res-studio/releases)
+[![Security CI](https://img.shields.io/github/actions/workflow/status/res-studio/res-studio/res-security.yml?branch=main&style=for-the-badge&label=SECURITY&color=25C7B7)](https://github.com/res-studio/res-studio/actions)
+[![MIT License](https://img.shields.io/badge/LICENSE-MIT-4B89FF?style=for-the-badge)](LICENSE)
+[![Local only](https://img.shields.io/badge/DEPLOYMENT-LOCAL_ONLY-202B4A?style=for-the-badge)](SECURITY.md)
 
-[![CI](https://img.shields.io/github/actions/workflow/status/res-studio/res-studio/res-security.yml?branch=main&label=Security%20CI)](https://github.com/res-studio/res-studio/actions)
-![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)
-![Status](https://img.shields.io/badge/status-pre--release-orange)
-![Scope](https://img.shields.io/badge/deployment-local--only-blue)
+**Inspect public web assets, explore JavaScript bundles, and understand what a browser loads.**
 
-[Quick start](#quick-start) · [Changelog](CHANGELOG.md) · [MCP](MCP.md) · [Features](#features) · [Security](SECURITY.md) · [License](LICENSE) · [Contributing](CONTRIBUTING.md)
+*Local-first · Open source · For websites you own or are authorized to inspect*
+
+[**Get started**](#quick-start) &nbsp;·&nbsp; [**Features**](#features) &nbsp;·&nbsp; [**Requirements**](#system-requirements) &nbsp;·&nbsp; [**Latest beta**](https://github.com/res-studio/res-studio/releases) &nbsp;·&nbsp; [**Customize branding**](BRANDING.md)
 
 </div>
 
 ---
 
 > [!IMPORTANT]
-> RES Studio is **pre-release software for local, authorized use**. Do not expose the API to the public internet. DNS-pinned connections have regression coverage, but Chromium egress isolation requires an explicitly enabled Docker worker; it is not included in the minimal app container.
+> **Beta software, not a hosted website.** Run on `127.0.0.1` only. Do not expose the API to the public internet. Inspect only websites and assets you own or are authorized to analyze. Chromium isolation requires the optional Docker worker.
+
+<table>
+<tr>
+<td width="33%" align="center"><strong>01 · CAPTURE</strong><br/><sub>Bounded HTML, CSS & JS discovery</sub></td>
+<td width="33%" align="center"><strong>02 · ANALYZE</strong><br/><sub>Bundle exploration & heuristic insights</sub></td>
+<td width="33%" align="center"><strong>03 · EXPORT</strong><br/><sub>Download resources & reports</sub></td>
+</tr>
+</table>
 
 ## Features
 
@@ -30,7 +39,7 @@ A local-first, open-source toolkit for authorized website asset inspection and J
 | Dynamic capture | Optional Chromium-based capture via Playwright |
 | JS analysis | Heuristic formatting, framework and dependency signals |
 | Bundle exploration | Webcrack-based bundle unpacking where supported |
-| Optional engines | Webcrack, Wakaru and Synchrony integrations |
+| Optional engines | Webcrack supported; Wakaru/Synchrony adapters remain incomplete or require additional setup |
 | Export | Download collected resources and analysis as ZIP/JSON |
 | Guardrails | URL filtering, size/time limits, API key support and rate limiting |
 
@@ -136,9 +145,9 @@ See [Release checklist](RELEASE_CHECKLIST.md) for the outstanding security, lice
 - [ ] Complete dependency and redistribution license review
 - [ ] First stable release
 
-## Documentation and version notes
+## Development history (archived notes)
 
-The detailed development notes below describe the evolution of the project. Some earlier sections describe historical limitations; consult the features above and the current source code for the latest implementation.
+The following notes are historical and may be outdated or contradictory. **Use the current feature table, requirements and security notes above as the authoritative overview.**
 
 ---
 
