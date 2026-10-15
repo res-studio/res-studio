@@ -73,6 +73,11 @@ class SecurityTest(unittest.TestCase):
    with self.subTest(host=host):
     with self.assertRaises(ValueError):
      server.safe_url('https://'+host)
+ def test_dynamic_capture_disabled_without_isolation(self):
+  with patch.dict(server.os.environ,{},clear=True):
+   response=self.client.post('/api/scan-dynamic',json={'url':'https://example.com'})
+  self.assertEqual(response.status_code,503)
+  self.assertIn('desabilitada',response.json()['detail'])
  def test_dns_rebinding_risk_is_documented(self):
   # Regression sentinel: safe_url validation alone does not pin requests DNS.
   self.assertTrue(callable(server.safe_url))
