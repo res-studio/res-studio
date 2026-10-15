@@ -13,13 +13,13 @@ with tempfile.TemporaryDirectory() as tmp:
     package=ROOT/'node_modules'/'@wakaru'/'cli'/'package.json'
     report['wakaru_package']={'passed':package.is_file(),'error':'' if package.is_file() else 'Wakaru npm package missing'}
     report['wakaru_integration']={'status':'pending','reason':'Actual CLI invocation and transformed output are not yet validated'}
-    for name in ['synchrony']:
-        path=ROOT/'node_modules'/'.bin'/name
-        if not path.exists():
-            report[name]={'passed':False,'error':'CLI binary missing after npm install'}
-            continue
-        help_proc=subprocess.run([str(path),'--help'],cwd=ROOT,capture_output=True,text=True,timeout=20)
-        report[name]={'passed':help_proc.returncode==0,'error':help_proc.stderr[-300:]}
+    # Synchrony is not declared in package.json; report as unsupported, not as a failed installed engine.
+    synchrony=ROOT/'node_modules'/'.bin'/'synchrony'
+    if synchrony.exists():
+        help_proc=subprocess.run([str(synchrony),'--help'],cwd=ROOT,capture_output=True,text=True,timeout=20)
+        report['synchrony']={'passed':help_proc.returncode==0,'error':help_proc.stderr[-300:]}
+    else:
+        report['synchrony']={'status':'not_installed','reason':'Optional engine not declared in package.json; no CLI available'}
     async def browser_test():
         from playwright.async_api import async_playwright
         async with async_playwright() as p:
@@ -33,4 +33,7 @@ with tempfile.TemporaryDirectory() as tmp:
     except Exception as exc: report['playwright']={'passed':False,'error':str(exc)}
 (ROOT/'test-report.json').write_text(json.dumps(report,indent=2,ensure_ascii=False))
 print(json.dumps(report,indent=2,ensure_ascii=False))
-if not all(item['passed'] for item in report.values() if 'passed' in item): sys.exit(1)
+# Gate required integrations; pending/unsupported optional engines remain explicitly visible.
+required=('webcrack','wakaru_package','playwright')
+if not all(report[name]['passed'] for name in required): sys.exit(1)
+if 'passed' in report['synchrony'] and not report['synchrony']['passed']: sys.exit(1)
