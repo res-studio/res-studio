@@ -169,3 +169,20 @@ jobs:
               print('ECOMMERCE_SCAN_FAILED',url,type(exc).__name__,str(exc)[:400])
               raise
           PY
+
+      - name: Validate bounded deep scan on real storefront
+        env:
+          RES_HTTP_ENGINE: curl
+        run: |
+          python - <<'PY'
+          from server import scan_deep, DeepScan
+          url='https://drivedacrisoficial.com/loja/'
+          try:
+              result=scan_deep(DeepScan(url=url,max_assets=65,max_pages=1,max_total_mb=20,max_depth=1,same_origin=True))
+              files=result['files']
+              print('DEEP_SCAN_SUCCESS','files',len(files),'types',sorted({f['type'] for f in files}),'errors',len(result.get('errors',[])),'truncated',result.get('truncated'))
+              assert files and any(f['type']=='html' for f in files)
+          except Exception as exc:
+              print('DEEP_SCAN_FAILED',type(exc).__name__,str(exc)[:400])
+              raise
+          PY
