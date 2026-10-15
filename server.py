@@ -80,28 +80,61 @@ def store_session(files):
 class Scan(BaseModel):
     url:str
 
-def safe_url(url):
+def resolve_public(url):
     p=urlparse(url)
     if p.scheme not in ('http','https') or not p.hostname or p.username or p.password:
         raise ValueError('URL HTTP(S) inválida')
     if p.port not in (None,80,443): raise ValueError('Porta não permitida')
     if p.fragment: raise ValueError('Fragmentos não permitidos')
-    if not p.hostname or len(p.hostname)>253: raise ValueError('Hostname inválido')
-    if p.hostname.endswith('.local') or p.hostname.endswith('.internal') or p.hostname.endswith('.localhost'):
+    host=p.hostname.rstrip('.').lower()
+    if not host or len(host)>253 or host in ('localhost','local','internal') or host.endswith(('.local','.internal','.localhost')):
         raise ValueError('Hostname interno bloqueado')
-    for result in socket.getaddrinfo(p.hostname,None,type=socket.SOCK_STREAM):
+    addresses=[]
+    for result in socket.getaddrinfo(host,p.port or (443 if p.scheme=='https' else 80),type=socket.SOCK_STREAM):
         ip=ipaddress.ip_address(result[4][0])
         if not ip.is_global: raise ValueError('Endereço privado/reservado bloqueado')
+        address=str(ip)
+        if address not in addresses: addresses.append(address)
+    if not addresses: raise ValueError('DNS sem endereço público')
+    return host,addresses
+
+def safe_url(url):
+    resolve_public(url)
     return url
 
+class PinnedAdapter(requests.adapters.HTTPAdapter):
+    """Resolve once, connect to validated IP, preserve Host header and TLS SNI."""
+    def __init__(self, host, addresses, **kwargs):
+        self._host=host
+        self._addresses=addresses
+        super().__init__(**kwargs)
+
+    def get_connection(self, url, proxies=None):
+        from urllib3 import HTTPSConnectionPool, HTTPConnectionPool
+        p=urlparse(url)
+        if p.hostname != self._host:
+            raise ValueError('Host inesperado na conexão')
+        pool_cls=HTTPSConnectionPool if p.scheme=='https' else HTTPConnectionPool
+        kw={'host':self._addresses[0],'port':p.port or (443 if p.scheme=='https' else 80),'maxsize':1,'block':True}
+        if p.scheme=='https':
+            kw.update(server_hostname=self._host,assert_hostname=self._host)
+        return pool_cls(**kw)
+
 def get(url):
-    # No automatic redirects; validate every hop to prevent SSRF.
+    # Disable environment proxies and validate each redirect before connecting.
     for _ in range(5):
-        safe_url(url)
+        host,addresses=resolve_public(url)
+        session=requests.Session()
+        session.trust_env=False
+        adapter=PinnedAdapter(host,addresses)
+        session.mount('http://',adapter)
+        session.mount('https://',adapter)
         try:
-            with requests.get(url, timeout=(4,12), allow_redirects=False, stream=True, headers={'User-Agent':'RES-Studio/0.1 (read-only analysis)'}) as r:
+            with session.get(url,timeout=(4,12),allow_redirects=False,stream=True,headers={'User-Agent':'RES-Studio/0.1 (read-only analysis)'}) as r:
                 if r.status_code in (301,302,303,307,308):
-                    url=urljoin(url,r.headers.get('Location',''))
+                    location=r.headers.get('Location')
+                    if not location: raise ValueError('Redirecionamento sem destino')
+                    url=urljoin(url,location)
                     continue
                 r.raise_for_status()
                 data=bytearray()
@@ -110,6 +143,8 @@ def get(url):
                     if len(data)>MAX_FILE: raise ValueError('Arquivo excede 2 MB')
                 return bytes(data),r.headers.get('content-type',''),url
         except requests.RequestException as e: raise ValueError(str(e))
+        finally:
+            session.close()
     raise ValueError('Redirecionamentos excessivos')
 
 class Assets(HTMLParser):
