@@ -1,0 +1,36 @@
+name: RES End-to-End UI and API
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**'
+      - '.github/workflows/res-e2e.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python and Chromium
+        working-directory: .
+        run: |
+          python -m pip install -r requirements.txt httpx
+          python -m playwright install --with-deps chromium
+      - name: Test real UI and API against example.com
+        working-directory: .
+        run: python tests/e2e.py
+      - name: Upload screenshot and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: res-e2e-evidence
+          path: |
+            e2e-desktop.png
+            e2e-report.json
+          if-no-files-found: ignore
