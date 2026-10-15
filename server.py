@@ -141,33 +141,47 @@ class PinnedAdapter(requests.adapters.HTTPAdapter):
         return pool_cls(**kw)
 
 def get(url):
-    # Disable environment proxies and validate each redirect before connecting.
+    """Fetch using validated, pinned public IPs; retry alternate IPs on transport errors.
+
+    HTTP status errors are returned as-is, not interpreted as anti-bot blocks.
+    Every redirect gets fresh DNS validation; proxies and ambient credentials
+    remain disabled. Never fall back to unvalidated system DNS.
+    """
     for _ in range(5):
-        host,addresses=resolve_public(url)
-        session=requests.Session()
-        session.trust_env=False
-        adapter=PinnedAdapter(host,addresses)
-        session.mount('http://',adapter)
-        session.mount('https://',adapter)
-        try:
-            with session.get(url,timeout=(4,12),allow_redirects=False,stream=True,headers={'User-Agent':'RES-Studio/0.1 (read-only analysis)'}) as r:
-                if r.status_code in (301,302,303,307,308):
-                    location=r.headers.get('Location')
-                    if not location: raise ValueError('Redirecionamento sem destino')
-                    url=urljoin(url,location)
-                    continue
-                if r.status_code >= 400:
-                    explanations={401:'Autenticação necessária',403:'Acesso negado pelo servidor (motivo não confirmado)',404:'Página não encontrada para esta requisição',429:'Limite de requisições do servidor',500:'Erro interno do site',502:'Gateway do site indisponível',503:'Serviço do site indisponível'}
-                    label=explanations.get(r.status_code,'Resposta HTTP de erro')
-                    raise ValueError(f'HTTP {r.status_code}: {label}. URL: {url[:200]}. O código HTTP não comprova bloqueio por bot.')
-                data=bytearray()
-                for chunk in r.iter_content(65536):
-                    data.extend(chunk)
-                    if len(data)>MAX_FILE: raise ValueError('Arquivo excede 2 MB')
-                return bytes(data),r.headers.get('content-type',''),url
-        except requests.RequestException as e: raise ValueError(str(e))
-        finally:
-            session.close()
+        host, addresses = resolve_public(url)
+        failures = []
+        redirect = None
+        for address in addresses[:4]:
+            session = requests.Session()
+            session.trust_env = False
+            adapter = PinnedAdapter(host, [address])
+            session.mount('http://', adapter)
+            session.mount('https://', adapter)
+            try:
+                with session.get(url, timeout=(4,12), allow_redirects=False,
+                                 stream=True, headers={'User-Agent':'RES-Studio/0.1 (read-only analysis)'}) as r:
+                    if r.status_code in (301,302,303,307,308):
+                        location = r.headers.get('Location')
+                        if not location: raise ValueError('Redirecionamento sem destino')
+                        redirect = urljoin(url,location)
+                        break
+                    if r.status_code >= 400:
+                        explanations={401:'Autenticação necessária',403:'Acesso negado pelo servidor (motivo não confirmado)',404:'Página não encontrada para esta requisição',429:'Limite de requisições do servidor',500:'Erro interno do site',502:'Gateway do site indisponível',503:'Serviço do site indisponível'}
+                        label=explanations.get(r.status_code,'Resposta HTTP de erro')
+                        raise ValueError(f'HTTP {r.status_code}: {label}. URL: {url[:200]}. O código HTTP não comprova bloqueio por bot.')
+                    data=bytearray()
+                    for chunk in r.iter_content(65536):
+                        data.extend(chunk)
+                        if len(data)>MAX_FILE: raise ValueError('Arquivo excede 2 MB')
+                    return bytes(data),r.headers.get('content-type',''),url
+            except requests.RequestException as exc:
+                failures.append(f'{address}: {type(exc).__name__}: {str(exc)[:120]}')
+            finally:
+                session.close()
+        if redirect is not None:
+            url = redirect
+            continue
+        raise ValueError('Falha de conexão em IPs públicos validados: '+'; '.join(failures)[:500])
     raise ValueError('Redirecionamentos excessivos')
 
 class Assets(HTMLParser):
