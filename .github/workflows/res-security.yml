@@ -1,7 +1,7 @@
 name: RES Security Regression
 on:
   push:
-    branches: [main]
+    branches: [main, release-hardening]
     paths:
       - '**'
       - '.github/workflows/res-security.yml'
