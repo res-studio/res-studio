@@ -124,6 +124,14 @@ RES Studio is a **software analysis and decompilation aid**, not a hosting servi
 
 The software is supplied **“AS IS”**, without warranties, as stated in the [MIT License](LICENSE).
 
+## Recommended: AI agent + MCP
+
+For more capable, multi-step **authorized** investigations, connect RES Studio's local MCP adapter to a compatible AI agent, such as **Claude with an Opus model** or **ChatGPT with an Astra coding model**, where MCP tool connectivity is supported by the chosen client/environment.
+
+**Why use an agent?** An agent can plan successive inspections, interpret collected HTML/CSS/JavaScript and observable API evidence, correlate findings, and help generate reports or reconstruction code. RES Studio performs the actual collection; the model reasons over the results.
+
+**Important limitations:** MCP does **not** unlock private server code, databases, credentials or hidden backend logic. It does not automatically improve scan speed or guarantee better results. Agent performance depends on model capability, tool availability, context limits, and the quality of collected evidence. Some clients may require an MCP-capable host or bridge. Start with the [MCP setup guide](MCP.md) and keep the API local.
+
 ## AI agent integration (MCP)
 
 An optional local stdio MCP adapter lets compatible agents use bounded static/dynamic capture and deep-scan tools. Install `requirements-mcp.txt` and follow [MCP setup and safety notes](MCP.md). It does not run an AI model locally and is not exposed as a public server.
