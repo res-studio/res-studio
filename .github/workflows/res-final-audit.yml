@@ -1,0 +1,65 @@
+name: RES Final Audit and Clean Install
+on:
+  push:
+    branches: [release-hardening]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  final-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Clean virtualenv installation
+        run: |
+          python -m venv /tmp/res-clean
+          /tmp/res-clean/bin/python -m pip install -r requirements-mcp.txt httpx
+          /tmp/res-clean/bin/python -m pip check
+          /tmp/res-clean/bin/python -c "import server, mcp_server; print('Clean install OK')"
+      - name: Security tests
+        run: /tmp/res-clean/bin/python -m unittest discover -s tests -v
+      - name: Source secret patterns (tracked files)
+        run: |
+          python - <<'PY'
+          import re, subprocess
+          paths=subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
+          rules=[
+            re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----'),
+            re.compile(r'gh[pousr]_[A-Za-z0-9_]{30,}'),
+            re.compile(r'AKIA[0-9A-Z]{16}'),
+            re.compile(r'sk-proj-[A-Za-z0-9_-]{20,}')
+          ]
+          findings=[]
+          for path in paths:
+            if not path or path.startswith('.github/workflows/res-final-audit.yml'): continue
+            try: data=open(path,'rb').read().decode('utf-8')
+            except (OSError,UnicodeError): continue
+            for rule in rules:
+              if rule.search(data): findings.append((path,rule.pattern))
+          if findings: raise SystemExit('Potential secrets in tracked files: '+str(findings))
+          print('No tracked-file matches for selected secret patterns; not a full historical audit')
+          PY
+      - name: Local-only static scan benchmark
+        run: |
+          /tmp/res-clean/bin/python - <<'PY'
+          import time
+          from unittest.mock import patch
+          from server import Scan,scan
+          payload=b'<html><head><title>Fixture</title></head><body>RES</body></html>'
+          samples=[]
+          with patch('server.get',return_value=(payload,'text/html','https://example.com/')):
+            for _ in range(20):
+              start=time.perf_counter()
+              result=scan(Scan(url='https://example.com/'))
+              assert result['files']
+              samples.append((time.perf_counter()-start)*1000)
+          samples.sort()
+          print(f'Fixture scan latency: median={samples[9]:.2f}ms p95={samples[18]:.2f}ms')
+          assert samples[18]<1000, 'Local fixture regression threshold exceeded'
+          PY
