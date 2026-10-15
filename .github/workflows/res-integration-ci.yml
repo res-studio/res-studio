@@ -1,0 +1,50 @@
+name: RES Integration CI
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install JS dependencies
+        working-directory: .
+        run: npm install --no-audit --no-fund
+      - name: Verify engine syntax
+        working-directory: .
+        run: npm test
+      - name: Run Webcrack on real input
+        working-directory: .
+        run: |
+          printf 'function add(a,b){return a+b};console.log(add(1,2));' > input.js
+          node engine.mjs webcrack input.js webcrack.json
+          node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("webcrack.json"));if(r.error||!r.code)throw Error(JSON.stringify(r));console.log("Webcrack OK:",r.code)'
+      - name: Test Wakaru status honestly
+        working-directory: .
+        run: |
+          node engine.mjs wakaru input.js wakaru.json
+          node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("wakaru.json"));if(!r.error)throw Error("Expected incomplete Wakaru integration");console.log("Wakaru integration incomplete:",r.error)'
+      - name: Install and launch Playwright Chromium
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+          python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); b=p.chromium.launch(); page=b.new_page(); page.goto("data:text/html,<title>RES browser check</title>"); assert page.title()=="RES browser check"; b.close(); p.stop(); print("Browser OK")'
+      - name: Upload engine reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: res-integration-report
+          path: |
+            webcrack.json
+            wakaru.json
+          if-no-files-found: ignore
