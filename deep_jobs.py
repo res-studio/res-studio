@@ -22,6 +22,8 @@ def _initialize(token):
 
 def _run(token,url,fetch,settings):
     try:
+        with LOCK:
+            JOBS[token]['status']='running'
         def save(asset):
             with sqlite3.connect(_db(token)) as conn:
                 conn.execute('INSERT INTO assets(id,url,type,size,content) VALUES(?,?,?,?,?)',
@@ -42,14 +44,14 @@ def submit(url,fetch,settings):
     with LOCK:
         now=time.monotonic()
         for token,job in list(JOBS.items()):
-            if now-job['created']>TTL and job['status']!='running':
+            if now-job['created']>TTL and job['status'] not in ('running','queued'):
                 JOBS.pop(token,None)
                 import shutil
                 shutil.rmtree(ROOT/token,ignore_errors=True)
         if len(JOBS)>=MAX_JOBS: raise ValueError('Fila cheia; tente mais tarde')
         token=secrets.token_hex(16)
         _initialize(token)
-        JOBS[token]={'status':'running','created':now,'count':0,'bytes':0,
+        JOBS[token]={'status':'queued','created':now,'count':0,'bytes':0,
                      'errors':[],'truncated':False,'pages':0,'discovered_urls':0}
         EXECUTOR.submit(_run,token,url,fetch,settings)
         return token
