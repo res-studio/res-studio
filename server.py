@@ -238,7 +238,7 @@ def scan_dynamic(s:Scan):
         files=[]
         for asset in result['assets']:
             content=asset['content']
-            files.append({'id':len(files),'type':asset['type'],'url':asset['url'], 'size':asset['size'], 'content':content,'analysis':analyze(asset['url'],content)})
+            files.append({'id':len(files),'type':asset['type'],'url':asset['url'], 'size':asset['size'], 'content':content,'analysis':analyze(asset['url'],content),'rendered':asset.get('rendered',False)})
         if not files: raise ValueError('Nenhum recurso coletado. Verifique bloqueios e permissões do site.')
         token=store_session(files)
         return {'token':token,'url':result['url'],'files':[{k:v for k,v in f.items() if k!='content'} for f in files], 'errors':result['errors'],'truncated':result['truncated'], 'requests':result['requests'], 'mode':'dynamic'}
