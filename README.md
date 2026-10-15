@@ -9,11 +9,11 @@
 [![MIT License](https://img.shields.io/badge/LICENSE-MIT-4B89FF?style=for-the-badge)](LICENSE)
 [![Local only](https://img.shields.io/badge/DEPLOYMENT-LOCAL_ONLY-202B4A?style=for-the-badge)](SECURITY.md)
 
-**Inspect public web assets, explore JavaScript bundles, and understand what a browser loads.**
+**Open-source website inspection, JavaScript deobfuscation and bundle analysis toolkit.** Discover HTML, CSS, JS assets, explore Webpack-style bundles with Webcrack, inspect observable API requests, and export findings.
 
 *Local-first · Open source · For websites you own or are authorized to inspect*
 
-[**Get started**](#quick-start) &nbsp;·&nbsp; [**Features**](#features) &nbsp;·&nbsp; [**Requirements**](#system-requirements) &nbsp;·&nbsp; [**Latest beta**](https://github.com/res-studio/res-studio/releases) &nbsp;·&nbsp; [**Customize branding**](BRANDING.md)
+[**Get started**](#quick-start) &nbsp;·&nbsp; [**Who it's for**](#who-is-res-studio-for) &nbsp;·&nbsp; [**Features**](#features) &nbsp;·&nbsp; [**Requirements**](#system-requirements) &nbsp;·&nbsp; [**Latest beta**](https://github.com/res-studio/res-studio/releases) &nbsp;·&nbsp; [**Customize branding**](BRANDING.md)
 
 </div>
 
@@ -29,6 +29,22 @@
 <td width="33%" align="center"><strong>03 · EXPORT</strong><br/><sub>Download resources & reports</sub></td>
 </tr>
 </table>
+
+## Who is RES Studio for?
+
+RES Studio is an **open-source web asset inspector and JavaScript analysis tool** for developers, security researchers working within authorization, and maintainers auditing their own websites.
+
+Common uses include:
+
+- **Website asset discovery:** inspect accessible HTML, CSS and JavaScript files and discover referenced resources.
+- **JavaScript bundle analysis:** format code heuristically and use Webcrack to explore compatible bundled JavaScript.
+- **Frontend debugging:** examine framework clues, imports, dependencies and observable HTTP/API interactions.
+- **Authorized web application research:** run bounded static scans, optional isolated browser capture, and export findings.
+- **AI-assisted investigation:** connect the local MCP adapter to compatible coding agents for multi-step analysis.
+
+**Not a backend source-code extractor:** RES Studio cannot retrieve private server source, databases, credentials or unexposed logic. It is a beta, local-only tool.
+
+**Related search terms:** web asset scanner · JavaScript analyzer · JavaScript deobfuscation · web bundle explorer · frontend inspection · MCP developer tools · open-source website analysis.
 
 ## Features
 
