@@ -42,6 +42,13 @@ async def capture(url):
             try:
                 await page.goto(url,wait_until='domcontentloaded',timeout=20000)
                 await page.wait_for_timeout(1500)
+                # Capture the rendered DOM as a separate artifact: useful for SPAs
+                # whose initial HTML is only an empty application shell.
+                rendered=await page.content()
+                encoded=rendered.encode('utf-8')
+                if encoded and len(encoded)<=2_000_000 and nonlocal_total[0]+len(encoded)<=12_000_000 and len(assets)<35:
+                    nonlocal_total[0]+=len(encoded)
+                    assets.append({'type':'html','url':page.url,'content':rendered,'size':len(encoded),'rendered':True})
             except Exception as exc:errors.append('Navegação: '+str(exc)[:200])
             return {'url':page.url if page.url.startswith(('http://','https://')) else url,'assets':assets,'errors':errors,'requests':requests,'truncated':len(assets)>=35}
         finally:await browser.close()
