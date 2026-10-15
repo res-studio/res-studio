@@ -19,13 +19,14 @@ A local-first, open-source toolkit for authorized website asset inspection and J
 ---
 
 > [!IMPORTANT]
-> RES Studio is **pre-release software for local, authorized use**. Do not expose the API to the public internet. DNS rebinding and Chromium network isolation are not fully addressed.
+> RES Studio is **pre-release software for local, authorized use**. Do not expose the API to the public internet. DNS-pinned connections have regression coverage, but operating-system egress isolation for Chromium is not implemented.
 
 ## Features
 
 | Capability | Description |
 | --- | --- |
 | Static capture | Inspect public HTML, JavaScript and CSS assets |
+| Deep scan | Bounded recursive HTML, JavaScript and CSS discovery; background jobs with SQLite, progress and cancellation |
 | Dynamic capture | Optional Chromium-based capture via Playwright |
 | JS analysis | Heuristic formatting, framework and dependency signals |
 | Bundle exploration | Webcrack-based bundle unpacking where supported |
@@ -54,7 +55,7 @@ Optional JavaScript engines: install Node.js 22+ and run `npm install` in the sa
 docker compose up --build
 ```
 
-The Docker image runs the basic API and interface only; it does **not** include Node engines or Chromium. It binds host port 8765 to localhost only. See [Security](SECURITY.md).
+The Docker image includes static/deep scanning and SQLite-backed background jobs, with a writable Docker volume for job storage; it does **not** include Node engines or Chromium. Background jobs are local-process state and are not restart-resumable. It binds host port 8765 to localhost only. See [Security](SECURITY.md).
 
 ## Contribute
 
@@ -64,7 +65,8 @@ See [Release checklist](RELEASE_CHECKLIST.md) for the outstanding security, lice
 
 ## Roadmap
 
-- [ ] DNS-pinned HTTP connections and egress filtering
+- [x] DNS-pinned HTTP connections (Requests 2.32+; regression tested)
+- [ ] Operating-system network egress filtering
 - [ ] Isolated Chromium worker
 - [ ] Fully validated container distribution with optional engines
 - [x] Standalone public repository
