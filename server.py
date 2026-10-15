@@ -476,6 +476,7 @@ def deep_export(token:str,mode:str='original'):
     """Bounded ZIP of an authorized deep-scan session, with explicit provenance."""
     if mode not in ('original','analyzed','reconstructed'):
         raise HTTPException(400,'Modo de exportação inválido')
+    import deep_jobs
     try:
         state=deep_jobs.status(token)
     except KeyError:
