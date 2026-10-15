@@ -109,7 +109,27 @@ class PinnedAdapter(requests.adapters.HTTPAdapter):
         self._addresses=addresses
         super().__init__(**kwargs)
 
+    def get_connection_with_tls_context(self, request, verify, proxies=None, cert=None):
+        # Requests >=2.32 uses this method, not get_connection().
+        # Preserve original hostname for TLS verification, but connect to a
+        # DNS-validated public IP to prevent DNS rebinding after validation.
+        from urllib3 import HTTPSConnectionPool, HTTPConnectionPool
+        from requests.adapters import _urllib3_request_context
+        p=urlparse(request.url)
+        if p.hostname != self._host:
+            raise ValueError('Host inesperado na conexão')
+        host_params,pool_kwargs=_urllib3_request_context(request,verify,cert,self.poolmanager)
+        pool_cls=HTTPSConnectionPool if p.scheme=='https' else HTTPConnectionPool
+        kwargs={'host':self._addresses[0],
+                'port':p.port or (443 if p.scheme=='https' else 80),
+                'maxsize':1,'block':True}
+        if p.scheme=='https':
+            kwargs.update(server_hostname=self._host,assert_hostname=self._host)
+            kwargs.update(pool_kwargs)
+        return pool_cls(**kwargs)
+
     def get_connection(self, url, proxies=None):
+        # Compatibility with Requests <2.32.
         from urllib3 import HTTPSConnectionPool, HTTPConnectionPool
         p=urlparse(url)
         if p.hostname != self._host:
