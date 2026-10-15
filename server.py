@@ -140,10 +140,7 @@ class PinnedAdapter(requests.adapters.HTTPAdapter):
             kw.update(server_hostname=self._host,assert_hostname=self._host)
         return pool_cls(**kw)
 
-def get(url):
-    if os.environ.get('RES_HTTP_ENGINE') == 'curl':
-        from curl_transport import get as curl_get
-        return curl_get(url)
+def get_requests(url):
     """Fetch using validated, pinned public IPs; retry alternate IPs on transport errors.
 
     HTTP status errors are returned as-is, not interpreted as anti-bot blocks.
@@ -186,6 +183,32 @@ def get(url):
             continue
         raise ValueError('Falha de conexão em IPs públicos validados: '+'; '.join(failures)[:500])
     raise ValueError('Redirecionamentos excessivos')
+
+
+def get(url):
+    """Use pinned requests first; retry with pinned curl on HTTP/transport failure.
+
+    Never fall back on URL validation, body-size, or redirect-limit failures.
+    Set RES_HTTP_ENGINE=requests or curl to force one engine.
+    """
+    engine = os.environ.get('RES_HTTP_ENGINE', 'auto').lower()
+    if engine == 'curl':
+        from curl_transport import get as curl_get
+        return curl_get(url)
+    if engine == 'requests':
+        return get_requests(url)
+    if engine != 'auto':
+        raise ValueError('RES_HTTP_ENGINE inválido')
+    try:
+        return get_requests(url)
+    except ValueError as exc:
+        message = str(exc)
+        retryable = message.startswith(('HTTP 403:', 'HTTP 404:', 'HTTP 429:', 'Falha de conexão em IPs públicos validados:'))
+        if not retryable:
+            raise
+        from curl_transport import get as curl_get
+        return curl_get(url)
+
 
 class Assets(HTMLParser):
     def __init__(self): super().__init__(); self.urls=[]
