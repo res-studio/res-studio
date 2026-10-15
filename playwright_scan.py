@@ -1,5 +1,6 @@
 """Optional dynamic capture with Playwright; local, read-only, public hosts only."""
-import asyncio, ipaddress, socket
+import asyncio
+from server import get
 from urllib.parse import urlparse
 from playwright.async_api import async_playwright
 
@@ -15,9 +16,13 @@ async def capture(url, validator):
     total = 0
     requests_log = []
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=['--no-first-run'])
+        browser = await p.chromium.launch(
+            headless=True,
+            proxy={'server':'http://127.0.0.1:9'},
+            args=['--no-first-run','--disable-background-networking','--disable-extensions',
+                  '--disable-sync','--disable-quic','--no-pings','--disable-features=WebRtcHideLocalIpsWithMdns'])
         try:
-            context = await browser.new_context(accept_downloads=False, service_workers='block', ignore_https_errors=False)
+            context = await browser.new_context(accept_downloads=False, service_workers='block', ignore_https_errors=False, permissions=[])
             page = await context.new_page()
             async def route_handler(route):
                 target = route.request.url
@@ -27,7 +32,13 @@ async def capture(url, validator):
                         await route.abort(); return
                     if route.request.resource_type in ('websocket', 'media', 'font', 'image', 'eventsource'):
                         await route.abort(); return
-                    await route.continue_()
+                    # Chromium is configured with a dead-end proxy. Fetch approved
+                    # resources in Python and fulfill the intercepted request.
+                    # This avoids browser DNS resolution for ordinary HTTP requests.
+                    body,mime,final=await asyncio.to_thread(get,target)
+                    if final != target:
+                        validator(final)
+                    await route.fulfill(status=200,body=body if route.request.method=='GET' else b'',content_type=mime or 'application/octet-stream')
                 except Exception:
                     await route.abort()
             await context.route('**/*', route_handler)
