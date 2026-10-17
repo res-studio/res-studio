@@ -11,6 +11,7 @@ MAX_BLOCKS = 150
 def extract_blocks(source, textures):
     resources, behaviors, atlas = {}, {}, {}
     skipped = []
+    names = []
     for entry in source.infolist():
         match = MODEL.fullmatch(entry.filename)
         if not match or len(behaviors) >= MAX_BLOCKS or entry.file_size > 131072:
@@ -41,10 +42,12 @@ def extract_blocks(source, textures):
             skipped.append(entry.filename)
             continue
         key = f"res_plant_{namespace}_{name.replace('/', '_')}"
-        identifier = f"res_import:{namespace}_{name.replace('/', '_')}"
+        identifier = f"res_import:{namespace}_{name.replace('/', '_')}_plant"
         if key in atlas:
             continue
         atlas[key] = {"textures": path.removesuffix(".png")}
+        display = name.split("/")[-1].replace("_", " ").title()
+        names.append(f"tile.{identifier}.name={display}")
         block = {
             "format_version": "1.21.0",
             "minecraft:block": {
@@ -61,6 +64,8 @@ def extract_blocks(source, textures):
         }
         behaviors[f"blocks/{namespace}/{name.replace('/', '_')}.json"] = json.dumps(block, indent=2).encode()
     if atlas:
+        resources["texts/en_US.lang"] = ("\\n".join(names) + "\\n").replace("\\n", "\n").encode("utf-8")
+        resources["texts/languages.json"] = json.dumps(["en_US"]).encode("utf-8")
         resources["textures/terrain_texture.json"] = json.dumps({
             "resource_pack_name": "RES Java asset import", "texture_name": "atlas.terrain", "texture_data": atlas
         }, indent=2).encode()
