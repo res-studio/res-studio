@@ -8,6 +8,8 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 app = FastAPI(title='RES Studio', version='0.1.0')
+from binary_api import router as binary_router
+app.include_router(binary_router)
 MAX_FILE=2_000_000
 MAX_TOTAL=12_000_000
 MAX_ASSETS=35
