@@ -39,7 +39,7 @@ def inspect_binary(path: str | Path) -> dict:
             result.update(format="PE", architecture={
                 0x14c: "x86", 0x8664: "x86_64", 0xaa64: "arm64",
             }.get(machine, f"machine_0x{machine:04x}"))
-    elif data.startswith(b"\\x7fELF") and len(data) >= 20:
+    elif data.startswith(b"\x7fELF") and len(data) >= 20:
         endian = "<" if data[5] == 1 else ">" if data[5] == 2 else None
         if endian and data[4] in (1, 2):
             machine = struct.unpack_from(endian + "H", data, 18)[0]
@@ -48,12 +48,12 @@ def inspect_binary(path: str | Path) -> dict:
     elif len(data) >= 4:
         magic = data[:4]
         mach = {
-            b"\\xfe\\xed\\xfa\\xce": ("Mach-O", 32),
-            b"\\xce\\xfa\\xed\\xfe": ("Mach-O", 32),
-            b"\\xfe\\xed\\xfa\\xcf": ("Mach-O", 64),
-            b"\\xcf\\xfa\\xed\\xfe": ("Mach-O", 64),
-            b"\\xca\\xfe\\xba\\xbe": ("Mach-O universal", None),
-            b"\\xbe\\xba\\xfe\\xca": ("Mach-O universal", None),
+            b"\xfe\xed\xfa\xce": ("Mach-O", 32),
+            b"\xce\xfa\xed\xfe": ("Mach-O", 32),
+            b"\xfe\xed\xfa\xcf": ("Mach-O", 64),
+            b"\xcf\xfa\xed\xfe": ("Mach-O", 64),
+            b"\xca\xfe\xba\xbe": ("Mach-O universal", None),
+            b"\xbe\xba\xfe\xca": ("Mach-O universal", None),
         }.get(magic)
         if mach:
             result["format"] = mach[0]
