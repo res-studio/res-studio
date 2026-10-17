@@ -95,6 +95,9 @@ def extract_recipes(source: zipfile.ZipFile):
             skipped.append({"path": entry.filename, "reason": "recipe limit"})
             break
         namespace, name = match.groups()
+        if any(part in ("", ".", "..") for part in name.split("/")):
+            skipped.append({"path": entry.filename, "reason": "unsafe recipe path"})
+            continue
         if entry.file_size > MAX_RECIPE_SIZE or entry.is_dir():
             skipped.append({"path": entry.filename, "reason": "oversized"})
             continue
