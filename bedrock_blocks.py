@@ -5,7 +5,7 @@ Only explicit cross models with a single PNG are accepted; no Java logic is port
 import json
 import re
 
-MODEL = re.compile(r"assets/([a-z0-9_.-]+)/models/block/([a-z0-9_/-]+)\\.json$")
+MODEL = re.compile(r"assets/([a-z0-9_.-]+)/models/block/([a-z0-9_/-]+)\.json$")
 MAX_BLOCKS = 150
 
 def extract_blocks(source, textures):
