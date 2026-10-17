@@ -1,0 +1,17 @@
+name: Bedrock sample mod end-to-end
+on:
+  push:
+    branches: [test/bedrock-sample-addon]
+  pull_request:
+    paths:
+      - 'tests/test_bedrock_e2e_sample.py'
+      - '.github/workflows/bedrock-e2e-sample.yml'
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -p 'test_bedrock_e2e_sample.py' -v
