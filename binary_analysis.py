@@ -34,7 +34,7 @@ def inspect_binary(path: str | Path) -> dict:
     }
     if data.startswith(b"MZ") and len(data) >= 0x40:
         pe_offset = struct.unpack_from("<I", data, 0x3C)[0]
-        if pe_offset <= len(data) - 6 and data[pe_offset:pe_offset + 4] == b"PE\\0\\0":
+        if pe_offset <= len(data) - 6 and data[pe_offset:pe_offset + 4] == b"PE\0\0":
             machine = struct.unpack_from("<H", data, pe_offset + 4)[0]
             result.update(format="PE", architecture={
                 0x14c: "x86", 0x8664: "x86_64", 0xaa64: "arm64",
