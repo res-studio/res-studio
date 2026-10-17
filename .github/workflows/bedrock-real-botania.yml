@@ -1,0 +1,29 @@
+name: Real Botania item conversion
+on:
+  push:
+    branches: [test/real-botania-items]
+  pull_request:
+    paths:
+      - 'tests/test_real_botania_items.py'
+      - '.github/workflows/bedrock-real-botania.yml'
+      - 'bedrock_items.py'
+      - 'bedrock_converter.py'
+jobs:
+  convert-botania:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Convert real Fabric mod
+        run: python -m unittest discover -s tests -p 'test_real_botania_items.py' -v
+      - name: Upload generated addon for manual Bedrock validation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: botania-static-bedrock-test
+          path: integration-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
