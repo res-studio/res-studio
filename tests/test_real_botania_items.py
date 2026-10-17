@@ -45,6 +45,7 @@ class BotaniaItemsIntegration(unittest.TestCase):
                 report = json.loads(addon.read("conversion-report.json"))
                 result = report["conversion"]
                 print("BOTANIA_CONVERSION:", json.dumps(result, indent=2)[:15000], flush=True)
+                print("BOTANIA_BLOCKS_CONVERTED:", result.get("blocks_converted", 0), flush=True)
                 self.assertGreater(result.get("items_converted", 0), 0,
                                    "No real Java item models converted")
                 self.assertIn("RES_Java_Assets.mcpack", addon.namelist())
@@ -55,6 +56,11 @@ class BotaniaItemsIntegration(unittest.TestCase):
                 with zipfile.ZipFile(io.BytesIO(addon.read("RES_Java_Recipes.mcpack"))) as bp:
                     item_files = [x for x in bp.namelist() if x.startswith("items/") and x.endswith(".json")]
                     self.assertEqual(len(item_files), result["items_converted"])
+                    block_files = [x for x in bp.namelist() if x.startswith("blocks/") and x.endswith(".json")]
+                    self.assertEqual(len(block_files), result.get("blocks_converted", 0))
+                    for block_path in block_files:
+                        block = json.loads(bp.read(block_path))
+                        self.assertIn("minecraft:block", block)
                     for item_path in item_files:
                         item = json.loads(bp.read(item_path))
                         self.assertIn("minecraft:item", item)
