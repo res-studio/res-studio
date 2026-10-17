@@ -5,6 +5,11 @@ No uploaded program is executed.
 """
 import hashlib
 import struct
+import os
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -68,3 +73,56 @@ async def inspect_upload(request: Request):
     if total == 0:
         raise HTTPException(400, "Empty binary")
     return inspect_bytes(b"".join(chunks))
+
+@router.post("/api/binary/decompile")
+async def decompile_upload(request: Request):
+    """Optional local Ghidra backend; never execute uploaded programs.
+
+    This does NOT provide a security sandbox. Use only in a dedicated
+    isolated worker for untrusted executables.
+    """
+    if os.environ.get("RES_ENABLE_GHIDRA") != "1":
+        raise HTTPException(503, "Ghidra desabilitado; configure RES_ENABLE_GHIDRA=1 em ambiente isolado")
+    executable = os.environ.get("RES_GHIDRA_ANALYZE_HEADLESS", "")
+    if not executable or not Path(executable).is_file():
+        raise HTTPException(503, "Configure RES_GHIDRA_ANALYZE_HEADLESS")
+    if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/octet-stream":
+        raise HTTPException(415, "Use application/octet-stream")
+    chunks = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > MAX_UPLOAD:
+            raise HTTPException(413, "Binary exceeds 16 MiB limit")
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    if not data:
+        raise HTTPException(400, "Empty binary")
+    metadata = inspect_bytes(data)
+    if metadata["format"] not in ("PE", "ELF", "Mach-O"):
+        raise HTTPException(422, "Formato não suportado pelo modo Ghidra")
+    scripts = Path(__file__).resolve().parent / "ghidra_scripts"
+    with tempfile.TemporaryDirectory(prefix="res-ghidra-") as folder:
+        root = Path(folder)
+        sample = root / "sample.bin"
+        output = root / "pseudocode.txt"
+        sample.write_bytes(data)
+        cmd = [executable, str(root / "project"), "RESBinary",
+               "-import", str(sample), "-scriptPath", str(scripts),
+               "-postScript", "RESDecompile.java", str(output),
+               "-deleteProject"]
+        try:
+            subprocess.run(cmd, cwd=str(root), timeout=120, check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        except subprocess.TimeoutExpired:
+            raise HTTPException(504, "Tempo de descompilação excedido")
+        except (OSError, subprocess.CalledProcessError):
+            raise HTTPException(422, "Ghidra não conseguiu analisar o arquivo")
+        if not output.is_file():
+            raise HTTPException(422, "Ghidra não produziu pseudocódigo")
+        with output.open("rb") as stream:
+            pseudocode = stream.read(512_001)
+        if len(pseudocode) > 512_000:
+            raise HTTPException(413, "Saída de pseudocódigo excedeu 500 KiB")
+        return {"metadata": metadata, "pseudocode": pseudocode.decode("utf-8", "replace"),
+                "note": "Pseudocódigo aproximado; não é o código-fonte original"}
