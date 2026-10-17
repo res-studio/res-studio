@@ -1,0 +1,29 @@
+name: RES Binary Validation
+on:
+  pull_request:
+    paths:
+      - 'binary_api.py'
+      - 'binary_analysis.py'
+      - 'test_binary_api.py'
+      - 'test_binary_analysis.py'
+      - 'server.py'
+      - 'index.html'
+      - '.github/workflows/res-binary.yml'
+  workflow_dispatch:
+
+jobs:
+  binary-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt httpx
+      - name: Validate syntax
+        run: python -m py_compile binary_api.py binary_analysis.py server.py test_binary_api.py test_binary_analysis.py
+      - name: Run binary tests
+        run: python -m unittest -v test_binary_analysis test_binary_api
