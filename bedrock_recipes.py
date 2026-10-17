@@ -10,7 +10,7 @@ import re
 import zipfile
 
 NAME = re.compile(r"^[a-z0-9_.-]+$")
-RECIPE_PATH = re.compile(r"^data/([a-z0-9_.-]+)/recipes/([a-z0-9_./-]+)[.]json$")
+RECIPE_PATH = re.compile(r"^data/([a-z0-9_.-]+)/recipes?/([a-z0-9_./-]+)[.]json$")
 MAX_RECIPE_SIZE = 128 * 1024
 MAX_RECIPES = 300
 
