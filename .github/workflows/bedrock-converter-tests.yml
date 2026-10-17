@@ -1,0 +1,21 @@
+name: Java to Bedrock converter tests
+on:
+  push:
+    branches: [feature/bedrock-conversion-pipeline]
+  pull_request:
+    paths:
+      - 'java_mod_analyzer.py'
+      - 'bedrock_converter.py'
+      - 'tests/test_bedrock_converter.py'
+      - 'tests/test_java_mod_analyzer.py'
+      - '.github/workflows/bedrock-converter-tests.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -p 'test_*mod_analyzer.py' -v
+      - run: python -m unittest discover -s tests -p 'test_bedrock_converter.py' -v
