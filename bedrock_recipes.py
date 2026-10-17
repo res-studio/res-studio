@@ -10,7 +10,7 @@ import re
 import zipfile
 
 NAME = re.compile(r"^[a-z0-9_.-]+$")
-RECIPE_PATH = re.compile(r"^data/([a-z0-9_.-]+)/recipes/([a-z0-9_./-]+)[.]json$")
+RECIPE_PATH = re.compile(r"^data/([a-z0-9_.-]+)/recipes?/([a-z0-9_./-]+)[.]json$")
 MAX_RECIPE_SIZE = 128 * 1024
 MAX_RECIPES = 300
 
@@ -18,8 +18,8 @@ MAX_RECIPES = 300
 def _item(value):
     if isinstance(value, str):
         name = value
-    elif isinstance(value, dict) and isinstance(value.get("item"), str):
-        name = value["item"]
+    elif isinstance(value, dict) and isinstance(value.get("item", value.get("id")), str):
+        name = value.get("item", value.get("id"))
     else:
         return None
     if ":" not in name:
@@ -79,6 +79,20 @@ def convert_recipe(value, identifier):
             "description": description, "tags": ["crafting_table"],
             "pattern": pattern, "key": {k: {"item": v} for k, v in mapped.items()},
             "result": result}}
+    if kind in ("minecraft:smelting", "minecraft:blasting", "minecraft:smoking", "minecraft:campfire_cooking"):
+        ingredient = _item(value.get("ingredient"))
+        if ingredient is None:
+            return None
+        tags = {
+            "minecraft:smelting": ["furnace"],
+            "minecraft:blasting": ["blast_furnace"],
+            "minecraft:smoking": ["smoker"],
+            "minecraft:campfire_cooking": ["campfire"]
+        }[kind]
+        # Bedrock furnace recipes do not preserve Java XP/cooking time.
+        return {"format_version": "1.20.10", "minecraft:recipe_furnace": {
+            "description": description, "tags": tags,
+            "input": ingredient, "output": result["item"]}}
     return None
 
 
