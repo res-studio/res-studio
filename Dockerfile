@@ -3,7 +3,8 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY server.py playwright_scan.py deep_scan.py deep_jobs.py isolated_chromium.py index.html ./
+COPY server.py playwright_scan.py deep_scan.py deep_jobs.py isolated_chromium.py binary_api.py binary_analysis.py index.html ./
+COPY ghidra_scripts/ ./ghidra_scripts/
 RUN useradd --create-home --uid 10001 resstudio && mkdir -p /data/jobs && chown -R resstudio:resstudio /data
 USER resstudio
 EXPOSE 8765
