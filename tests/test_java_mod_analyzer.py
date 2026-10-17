@@ -3,7 +3,7 @@ import json
 import unittest
 import zipfile
 
-from java_mod_analyzer import analyze_jar, InvalidMod
+from java_mod_analyzer import analyze_jar, InvalidMod, MAX_ENTRIES
 
 def jar(files):
     out = io.BytesIO()
@@ -32,7 +32,7 @@ class JavaModAnalyzerTests(unittest.TestCase):
 
     def test_archive_bomb_limit(self):
         with self.assertRaises(InvalidMod):
-            analyze_jar(jar({f"item-{i}": b"x" for i in range(5001)}))
+            analyze_jar(jar({f"item-{i}": b"x" for i in range(MAX_ENTRIES + 1)}))
 
 if __name__ == "__main__":
     unittest.main()
