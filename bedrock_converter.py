@@ -16,6 +16,7 @@ import uuid
 import zipfile
 
 from java_mod_analyzer import analyze_jar, InvalidMod
+from bedrock_recipes import extract_recipes
 
 MAX_TEXTURE = 4 * 1024 * 1024
 MAX_TEXTURES = 500
@@ -67,11 +68,27 @@ def convert_static(data: bytes) -> tuple[bytes, dict]:
         "limitations": [
             "No Java logic or classes translated",
             "Textures require Bedrock entity/block/item mappings",
-            "Models, animations, recipes and gameplay require manual porting",
+            "Models, animations and Java-coded gameplay require manual porting",
+            "Only supported vanilla-item crafting recipes are ported",
         ],
     }
+    with zipfile.ZipFile(io.BytesIO(data)) as source:
+        recipes, recipe_report = extract_recipes(source)
+    report["conversion"].update(recipe_report)
+    if recipes:
+        report["conversion"]["status"] = "partial-assets-and-recipes"
+    bp_manifest = {"format_version": 2,
+                   "header": {"name": "RES Java recipe import",
+                              "description": "Supported vanilla crafting recipes imported from Java",
+                              "uuid": str(uuid.uuid4()), "version": [1, 0, 0],
+                              "min_engine_version": [1, 20, 0]},
+                   "modules": [{"type": "data", "uuid": str(uuid.uuid4()),
+                                "version": [1, 0, 0]}]}
     rp = _pack({"manifest.json": _json(manifest), **textures})
-    addon = _pack({"RES_Java_Assets.mcpack": rp, "conversion-report.json": _json(report)})
+    packs = {"RES_Java_Assets.mcpack": rp, "conversion-report.json": _json(report)}
+    if recipes:
+        packs["RES_Java_Recipes.mcpack"] = _pack({"manifest.json": _json(bp_manifest), **recipes})
+    addon = _pack(packs)
     return addon, report
 
 
