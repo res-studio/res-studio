@@ -41,7 +41,7 @@ def convert_static(data: bytes) -> tuple[bytes, dict]:
     textures = {}
     with zipfile.ZipFile(io.BytesIO(data)) as source:
         for entry in source.infolist():
-            match = re.fullmatch(r"assets/([a-z0-9_.-]+)/textures/(.+\\.png)", entry.filename)
+            match = re.fullmatch(r"assets/([a-z0-9_.-]+)/textures/(.+[.]png)", entry.filename)
             if not match:
                 continue
             namespace, relative = match.groups()
