@@ -1,0 +1,17 @@
+name: Real Fabric mod integration
+on:
+  push:
+    branches: [test/real-fabric-salvage]
+  pull_request:
+    paths:
+      - 'tests/test_real_fabric_salvage.py'
+      - '.github/workflows/bedrock-real-mod.yml'
+jobs:
+  convert-real-mod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -p 'test_real_fabric_salvage.py' -v
