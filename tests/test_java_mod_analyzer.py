@@ -32,7 +32,7 @@ class JavaModAnalyzerTests(unittest.TestCase):
 
     def test_archive_bomb_limit(self):
         with self.assertRaises(InvalidMod):
-            analyze_jar(jar({"huge": b"x" * (128 * 1024 * 1024 + 1)}))
+            analyze_jar(jar({f"item-{i}": b"x" for i in range(5001)}))
 
 if __name__ == "__main__":
     unittest.main()
