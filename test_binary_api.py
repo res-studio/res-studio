@@ -9,6 +9,13 @@ class BinaryAPITests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
 
+    def test_ghidra_disabled_by_default(self):
+        from unittest.mock import patch
+        with patch.dict("os.environ", {"RES_ENABLE_GHIDRA": "0"}):
+            response = self.client.post("/api/binary/decompile", content=b"MZ",
+                headers={"content-type": "application/octet-stream"})
+        self.assertEqual(response.status_code, 503)
+
     def test_pe_upload(self):
         sample = bytearray(128)
         sample[:2] = b"MZ"
