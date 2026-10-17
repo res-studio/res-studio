@@ -18,6 +18,7 @@ import zipfile
 from java_mod_analyzer import analyze_jar, InvalidMod
 from bedrock_recipes import extract_recipes
 from bedrock_items import extract_items
+from bedrock_blocks import extract_blocks
 
 MAX_TEXTURE = 4 * 1024 * 1024
 MAX_TEXTURES = 500
@@ -90,10 +91,15 @@ def convert_static(data: bytes) -> tuple[bytes, dict]:
     report["conversion"].update(item_report)
     if item_behaviors:
         report["conversion"]["status"] = "partial-items-and-assets"
-    rp = _pack({"manifest.json": _json(manifest), **textures, **item_resources})
+    with zipfile.ZipFile(io.BytesIO(data)) as source:
+        block_resources, block_behaviors, block_report = extract_blocks(source, textures)
+    report["conversion"].update(block_report)
+    if block_behaviors:
+        report["conversion"]["status"] = "partial-items-blocks-and-assets"
+    rp = _pack({"manifest.json": _json(manifest), **textures, **item_resources, **block_resources})
     packs = {"RES_Java_Assets.mcpack": rp, "conversion-report.json": _json(report)}
-    if recipes or item_behaviors:
-        packs["RES_Java_Recipes.mcpack"] = _pack({"manifest.json": _json(bp_manifest), **recipes, **item_behaviors})
+    if recipes or item_behaviors or block_behaviors:
+        packs["RES_Java_Recipes.mcpack"] = _pack({"manifest.json": _json(bp_manifest), **recipes, **item_behaviors, **block_behaviors})
     addon = _pack(packs)
     return addon, report
 
